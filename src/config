@@ -1,0 +1,20 @@
+#!/bin/bash
+
+MOUNTBASE="/mnt"
+
+# Colibri WebUI
+WEBUI_HTTPD_PID="/run/httpd.pid"
+WEBUI_FIFO="/run/webui.fifo"
+WEBUI_BFIFO="/run/webui.bfifo"
+WEBUI_DB="/run/webui.db"
+
+# Boot delay
+BOOT_DELAY=2
+
+# Linux live
+MEMORY=/mnt
+BUNDLES=$MEMORY/bundles
+CHANGES=$MEMORY/changes
+UNION=$MEMORY/union
+BDATA=$MEMORY/bdata
+BEXT=cb
