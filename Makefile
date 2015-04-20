@@ -1,7 +1,7 @@
 INSTALL	?= install
 MKDIR	?= mkdir
 CP		?= cp
-CHOWN	?= chown
+CHMOD	?= chmod
 
 DESTDIR ?= ./rootfs
 
@@ -9,10 +9,10 @@ all:
 
 directory-tree:
 	$(MKDIR) -p $(DESTDIR)/{bin,sbin,etc,dev,lib/modules,mnt,proc,run,sys,tmp}
-	$(CHOWN) 1777 $(DESTDIR)/tmp
+	$(CHMOD) 1777 $(DESTDIR)/tmp
 
 install-www:
-	$(CP) -R www $(DESTDIR)
+	$(CP) -aRv www $(DESTDIR)/
 	
 install-kit:
 	$(INSTALL) -D -m 755 src/init $(DESTDIR)/init
