@@ -120,11 +120,19 @@ change_root()
 
 init_network()
 {
-	if is_this_qemu; then
-		ifconfig eth0 10.0.2.15 up
-	else
-		ifconfig $NETWORK_IF $NETWORK_IPV4 up
-	fi
+	#~ if is_this_qemu; then
+		#~ ifconfig eth0 10.0.2.15 up
+	#~ else
+		#~ ifconfig $NETWORK_IF $NETWORK_IPV4 up
+	#~ fi
+	ip addr add $NETWORK_IPV4 dev $NETWORK_IF
+	ip link set $NETWORK_IF up
+}
+
+cleanup_network()
+{
+	ip addr flush dev $NETWORK_IF
+	ip link set $NETWORK_IF down
 }
 
 # mount virtual filesystems like proc etc

@@ -108,6 +108,7 @@ init_union "$CHANGES" "$UNION"
 union_append_bundles "$BUNDLES" "$BDATA" "$UNION"
 
 cleanup_webui
+cleanup_network
 
 fstab_create "$UNION"
 
