@@ -32,8 +32,8 @@ transfer_initramfs()
 }
 
 # Setup empty union
-# $1 = changes directory (ramfs or persistent changes)
-# $2 = union directory where to mount the union
+# @param $1 = changes directory (ramfs or persistent changes)
+# @param $2 = union directory where to mount the union
 #
 init_union()
 {
@@ -48,9 +48,9 @@ init_union()
 
 # Mount squashfs filesystem bundles
 # and add them to union
-# $1 = directory where to search for bundles
-# $2 = directory where to mount bundles
-# $3 = directory where union is mounted
+# @param $1 = directory where to search for bundles
+# @param $2 = directory where to mount bundles
+# @param $3 = directory where union is mounted
 #
 union_append_bundles()
 {
@@ -66,7 +66,7 @@ union_append_bundles()
 }
 
 # Create empty fstab properly
-# $1 = root directory
+# @param $1 = root directory
 #
 fstab_create()
 {
@@ -83,7 +83,7 @@ fstab_create()
 }
 
 # Change root and execute init
-# $1 = where to change root
+# @param $1 = where to change root
 #
 change_root()
 {
@@ -118,22 +118,98 @@ change_root()
    exec $CHROOT . $INIT < dev/console > dev/console 2>&1
 }
 
+############################# Network ##################################
+
+# Initialize network device(s) and setup ip address
+#
 init_network()
 {
-	#~ if is_this_qemu; then
-		#~ ifconfig eth0 10.0.2.15 up
-	#~ else
-		#~ ifconfig $NETWORK_IF $NETWORK_IPV4 up
-	#~ fi
 	ip addr add $NETWORK_IPV4 dev $NETWORK_IF
 	ip link set $NETWORK_IF up
 }
 
+# Releas network device(s)
+#
 cleanup_network()
 {
 	ip addr flush dev $NETWORK_IF
 	ip link set $NETWORK_IF down
 }
+
+############################### GPIO ###################################
+
+# Configure GPIO
+#
+init_gpio()
+{
+	if [ "x$RECOVERY_PIN" != "xno" ]; then
+		echo "$RECOVERY_PIN" > /sys/class/gpio/export
+		GPIO_DIR="gpio$RECOVERY_PIN"
+		echo "in" > /sys/class/gpio/$GPIO_DIR/direction
+	fi
+}
+
+is_recovery_gpio_active()
+{
+	if [ "x$RECOVERY_PIN" != "xno" ]; then
+		GPIO_DIR="gpio$RECOVERY_PIN"
+		V=$(cat /sys/class/gpio/$GPIO_DIR/value)
+		if [ "$V" == "$RECOVERY_ACTIVE" ]; then
+			# Return true if recovery pin state is equal to active state
+			return 0
+		else
+			return 1
+		fi
+	else
+		# Return false in case no recovery pin is used
+		return 1
+	fi
+}
+
+# Cleanup GPIO settings
+#
+cleanup_gpio()
+{
+	if [ "x$RECOVERY_PIN" != "xno" ]; then
+		echo "$RECOVERY_PIN" > /sys/class/gpio/unexport
+	fi
+}
+
+############################### UART ###################################
+
+# Configure UART
+#
+init_uart()
+{
+	stty -F $UART_DEV $UART_BAUD
+}
+
+# Write data to UART and return the response
+# @param $1 = write content
+# @return read content
+write_uart()
+{
+	cat < $UART_DEV > $UART_TMP &
+	CAT_PID=$!
+	# 
+	printf "$1" > $UART_DEV
+	sleep $UART_DELAY
+	#
+	kill $CAT_PID
+	#RESP=$(cat $UART_TMP)
+	cat $UART_TMP
+	rm $UART_TMP
+	#echo $RESP
+}
+
+# Cleanup UART settings
+#
+cleanup_uart()
+{
+	true
+}
+
+############################# System ##################################
 
 # mount virtual filesystems like proc etc
 #
@@ -238,6 +314,8 @@ init_fs()
 	#modprobe minix
 	return
 }
+
+############################# Library ##################################
 
 # @param $1 device
 # @param $2 size

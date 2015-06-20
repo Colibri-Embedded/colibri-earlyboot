@@ -38,24 +38,27 @@ mkdir -p /mnt/boot
 mount $BOOTPART -o ro /mnt/boot
 # Copy configuration
 cp /mnt/boot/earlyboot/earlyboot.conf /lib/.user_config 
+# Copy custom functions script
+cp /mnt/boot/earlyboot/product.sh /lib/.product.sh 
 # Unmount boot partition
 umount $BOOTPART
 rm -rf /mnt/boot
 
 . /lib/.config
-. /lib/.user_config 
+. /lib/.user_config
+. /lib/.product.sh
 
 # Delay the boot process until slow devices are loaded
 sleep $BOOT_DELAY
 
 init_network
 init_webui
+init_uart
 
 webui_print_success "-" "Colibri Kit init <www.colibri-embedded.org>"
 webui_print_success "-" "Early-boot system copied to RAM."
 webui_print_success "-" "Early-boot WebUI up and running."
 webui_print_simple "-"  "========= First Time Boot ========="
-
 
 echo "IS_FIRSBOOT = $IS_FIRSBOOT"
 
@@ -64,6 +67,9 @@ if [ "$DEBUG_CONSOLE" == "1" ]; then
 fi
 
 if [ "$IS_FIRSBOOT" == "1" ]; then
+	# Custom commands
+	custom_firstboot_begin
+	
 	webui_print_question "-"  "Choose further action:"
 	FIRST_FORMAT=$(webui_waitfor_response "Format partitions:1|Poweroff:0")
 
@@ -92,6 +98,9 @@ if [ "$IS_FIRSBOOT" == "1" ]; then
 	umount /mnt/boot
 	# Set firstboot indication for application's system firstboot handling
 	echo "This file indicates that we are booting for the first time" > /lib/firstboot
+	
+	# Custom commands
+	custom_firstboot_end
 else
 	mount_partitions $DISK
 	# Boot partition is not used anymore
@@ -107,6 +116,7 @@ init_union "$CHANGES" "$UNION"
 # add data to union
 union_append_bundles "$BUNDLES" "$BDATA" "$UNION"
 
+cleanup_uart
 cleanup_webui
 cleanup_network
 
