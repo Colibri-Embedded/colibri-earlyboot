@@ -23,10 +23,6 @@ DISK=/dev/mmcblk0
 if is_this_qemu; then
 	init_qemu
 	DISK=/dev/sda
-#else
-	# Workaround for fatresize wrong disk devname deduction from 
-	# partdevname. TODO: write a patch for fatresize
-	#ln -s /dev/mmcblk0 /dev/mmcblk0p
 fi
 
 BOOTPART=$(devname_to_partition $DISK 1)

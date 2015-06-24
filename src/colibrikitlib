@@ -181,25 +181,15 @@ cleanup_gpio()
 #
 init_uart()
 {
-	stty -F $UART_DEV $UART_BAUD
+	true
 }
 
 # Write data to UART and return the response
 # @param $1 = write content
 # @return read content
 write_uart()
-{
-	cat < $UART_DEV > $UART_TMP &
-	CAT_PID=$!
-	# 
-	printf "$1" > $UART_DEV
-	sleep $UART_DELAY
-	#
-	kill $CAT_PID
-	#RESP=$(cat $UART_TMP)
-	cat $UART_TMP
-	rm $UART_TMP
-	#echo $RESP
+{	
+	ebuart -w $UART_DEV $UART_BAUD "$1"
 }
 
 # Cleanup UART settings
@@ -553,14 +543,6 @@ mount_partitions()
 		PART_LABEL=$(echo $P | awk 'BEGIN{FS=":"};{print $4}')
 		PART_NUM=$(echo $P | awk 'BEGIN{FS=":"};{print $1}')
 		#PART_TYPE=$(echo $P | awk 'BEGIN{FS=":"};{print $2}')
-		
-		#~ if [ "$DO_RESIZE" == "yes" ]; then
-			#~ msg_id=$(webui_print_working "-" "Resizing \"$PART_LABEL\" partition...")
-			#~ resize_partition $(devname_to_partition $DISK $PART_NUM) $PART_SIZE $PART_FS
-			#~ webui_print_success $msg_id "Resize \"$PART_LABEL\" partition."
-		#~ else
-#~ 
-		#~ fi
 		
 		if [ "$PART_FS" != "-" ]; then
 		
