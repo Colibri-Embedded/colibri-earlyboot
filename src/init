@@ -115,6 +115,7 @@ union_append_bundles "$BUNDLES" "$BDATA" "$UNION"
 cleanup_uart
 cleanup_webui
 cleanup_network
+cleanup_proc_sysfs
 
 fstab_create "$UNION"
 

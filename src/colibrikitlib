@@ -80,6 +80,24 @@ fstab_create()
 	echo tmpfs /tmp	tmpfs defaults 0 0  >> $FSTAB
 	echo devpts /dev/pts devpts gid=5,mode=620 0 0 >> $FSTAB
 	echo tmpfs /dev/shm tmpfs defaults 0 0 >> $FSTAB
+	
+	FSMOUNT="$1/etc/init.d/earlyboot.mount"
+	echo "#/bin/bash" > $FSMOUNT
+	echo "mount /tmp" >> $FSMOUNT
+	echo "mount /run" >> $FSMOUNT
+	echo "mount /dev/pts" >> $FSMOUNT
+	echo "mount /dev/shm" >> $FSMOUNT
+	chmod +x $FSMOUNT
+	
+	FSUMOUNT="$1/etc/init.d/earlyboot.umount"
+	echo "#/bin/bash" > $FSUMOUNT
+	echo "umount /tmp" >> $FSUMOUNT
+	echo "umount /run" >> $FSUMOUNT
+	echo "umount /dev/pts" >> $FSUMOUNT
+	echo "umount /dev/shm" >> $FSUMOUNT
+	echo "umount /sys"  >> $FSUMOUNT
+	echo "umount /proc"  >> $FSUMOUNT
+	chmod +x $FSUMOUNT
 }
 
 # Change root and execute init
@@ -88,9 +106,6 @@ fstab_create()
 change_root()
 {
    #debug_log "change_root" "$*"
-
-   umount /proc
-   umount /sys
    rm -Rf /lib/modules # this will no longer be needed at all
 
    cd "$1"
@@ -211,6 +226,12 @@ init_proc_sysfs()
    mount -n -t sysfs sysfs /sys
    mount -n -o remount,rw rootfs /
    ln -sf /proc/mounts /etc/mtab
+}
+
+cleanup_proc_sysfs()
+{
+   umount /proc &> /dev/null
+   umount /sys &> /dev/null
 }
 
 # make sure some devices are there

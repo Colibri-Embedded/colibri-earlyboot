@@ -2,10 +2,27 @@
 
 export PATH=.:/:/usr/sbin:/usr/bin:/sbin:/bin
 
-. /lib/.config
 . /lib/colibrikitlib
+. /lib/.config
+. /lib/.user_config
+. /lib/.product.sh
 
-init_proc_sysfs
-init_devs
+RC=$(cat /run/rc.earlyboot)
 
-exec /bin/bash < dev/console > dev/console 2>&1
+if [ "$RC" == "shutdown" ]; then
+	/bin/bash
+elif [ "$RC" == "reboot" ]; then
+	change_root "$UNION"
+elif [ "$RC" == "update" ]; then
+	# umount bundles
+	echo "Updating System..."
+	sleep 1
+	# call update_procedure
+	echo "Booting System..."
+	# remount bundles
+	change_root "$UNION"
+elif [ "$RC" == "console" ]; then
+	init_proc_sysfs
+	/bin/bash
+fi
+
