@@ -3,6 +3,7 @@ var ajaxIsBusy = false;
 var ajaxWaitingFor = null;
 var queryQueue = null;
 var userResponse = false;
+var pollingTheInstaller = 0;
 
 function addCSSClassToElementsStartsWithId( id, cssClass ) {
 	var children = document.body.getElementsByTagName('*');
@@ -57,7 +58,7 @@ function webuiResponde(item_id, resp)
 	loadXMLDoc(queryString);
 }
 
-function loadXMLDoc(query_string)
+function loadXMLDoc(query_string, callback)
 {
 	var xmlhttp;
 	
@@ -84,14 +85,25 @@ function loadXMLDoc(query_string)
 		{
 			if(xmlhttp.status==200)
 			{
-				if(ajaxWaitingFor != "drop")
-					document.getElementById("webui-content").innerHTML=unescape(xmlhttp.responseText);
-				else
+				if(ajaxWaitingFor != "drop") {
+					if ('function' == typeof callback)
+						callback(null, xmlhttp);
+					else
+						document.getElementById("webui-content").innerHTML=unescape(xmlhttp.responseText);
+				} else {
 					ajaxWaitingFor = "set";
+				}
 			}
 			else
 			{
-				document.getElementById("webui-content").innerHTML="<div>WebUI connection error.</div>";
+				if ('function' == typeof callback) {
+					callback(xmlhttp, null);
+				} else if (!(pollingTheInstaller++)) {
+					setTimeout(pollInstaller, 1);
+					document.getElementById("webui-content").innerHTML='<div><i class="fa fa-cog rotating fa-fw"></i>Booting the system for next step...</div>';
+				} else {
+					document.getElementById("webui-content").innerHTML="<div>WebUI connection error.</div>";
+				}
 			}
 			ajaxIsBusy = false;
 			if(queryQueue != null)
@@ -111,4 +123,19 @@ function loadXMLDoc(query_string)
 	ajaxIsBusy = true;
 	xmlhttp.open("GET",query_string,true);
 	xmlhttp.send();
+}
+
+/* maybe embed method and conf in object literal */
+pollInstaller.timeout = 1000;
+pollInstaller.url = 'recovery/install/';
+function pollInstaller ()
+{
+	loadXMLDoc(pollInstaller.url, function (err, res) {
+		if (err) {
+			console.error(err);
+			setTimeout(pollInstaller, pollInstaller.timeout);
+		} else {
+			window.location.assign(pollInstaller.url);
+		}
+	});
 }

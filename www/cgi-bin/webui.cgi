@@ -47,13 +47,13 @@ for item in $(cat $WEBUI_DB| sed 's/ /%20%/g'); do
 	V=${item##*::}
 	case $T in
 		success)
-			echo "<div id=\"item${IID}\"><i class=\"fa fa-check-circle\"></i> $V</div>"
+			echo "<div id=\"item${IID}\"><i class=\"fa fa-check-circle fa-fw\"></i> $V</div>"
 			;;
 		working)
-			echo "<div id=\"item${IID}\"><i class=\"fa fa-cog rotating\"></i> $V</div>"
+			echo "<div id=\"item${IID}\"><i class=\"fa fa-cog rotating fa-fw\"></i> $V</div>"
 			;;
 		question)
-			echo "<div id=\"item${IID}\"><i class=\"fa fa-question-circle\"></i> $V</div>"
+			echo "<div id=\"item${IID}\"><i class=\"fa fa-question-circle fa-fw\"></i> $V</div>"
 			;;
 		choice)
 			echo "<p>"
