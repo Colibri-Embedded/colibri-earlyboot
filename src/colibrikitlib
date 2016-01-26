@@ -204,7 +204,7 @@ init_uart()
 # @return read content
 write_uart()
 {	
-	ebuart -w $UART_DEV $UART_BAUD "$1"
+	ebuart -d $UART_DEV -b $UART_BAUD -t "$1"
 }
 
 # Cleanup UART settings

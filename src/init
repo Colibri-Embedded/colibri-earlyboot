@@ -35,7 +35,12 @@ mount $BOOTPART -o ro /mnt/boot
 # Copy configuration
 cp /mnt/boot/earlyboot/earlyboot.conf /lib/.user_config 
 # Copy custom functions script
-cp /mnt/boot/earlyboot/product.sh /lib/.product.sh 
+cp /mnt/boot/earlyboot/product.sh /lib/.product.sh
+# Copy custom webui
+if [ -f /mnt/boot/webui.tar ]; then
+	rm -Rf /www/*
+	tar xf /mnt/boot/webui.tar -C /www/
+fi
 # Unmount boot partition
 umount $BOOTPART
 rm -rf /mnt/boot
@@ -51,7 +56,7 @@ init_network
 init_webui
 init_uart
 
-webui_print_success "-" "Colibri Kit init <www.colibri-embedded.org>"
+webui_print_success "-" "Colibri Kit init [colibri-embedded.github.io]"
 webui_print_success "-" "Early-boot system copied to RAM."
 webui_print_success "-" "Early-boot WebUI up and running."
 webui_print_simple "-"  "========= First Time Boot ========="
@@ -66,8 +71,8 @@ if [ "$IS_FIRSBOOT" == "1" ]; then
 	# Custom commands
 	custom_firstboot_begin
 	
-	webui_print_question "-"  "Choose further action:"
-	FIRST_FORMAT=$(webui_waitfor_response "Format partitions:1|Poweroff:0")
+	#webui_print_question "-"  "Choose further action:"
+	FIRST_FORMAT=$(webui_waitfor_response "Install:1")
 
 	webui_print_simple "-"  "========= System Preparations Started ========="
 	prepare_partitions $DISK
