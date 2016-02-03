@@ -1,4 +1,24 @@
 #!/bin/bash
+########################################################################
+#
+#  This file is part of colibri-earlyboot.
+#  
+#  Copyright (C) 2016	Daniel Kesler <kesler.daniel@gmail.com>
+#  
+#  Foobar is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
+#  
+#  Foobar is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+#
+########################################################################
 
 export PATH=.:/:/usr/sbin:/usr/bin:/sbin:/bin
 
@@ -37,9 +57,9 @@ cp /mnt/boot/earlyboot/earlyboot.conf /lib/.user_config
 # Copy custom functions script
 cp /mnt/boot/earlyboot/product.sh /lib/.product.sh
 # Copy custom webui
-if [ -f /mnt/boot/webui.tar ]; then
+if [ -f /mnt/boot/earlyboot/webui.tar ]; then
 	rm -Rf /www/*
-	tar xf /mnt/boot/webui.tar -C /www/
+	tar xf /mnt/boot/earlyboot/webui.tar -C /www/
 fi
 # Unmount boot partition
 umount $BOOTPART
@@ -57,9 +77,8 @@ init_webui
 init_uart
 
 webui_print_success "-" "Colibri Kit init [colibri-embedded.github.io]"
-webui_print_success "-" "Early-boot system copied to RAM."
-webui_print_success "-" "Early-boot WebUI up and running."
-webui_print_simple "-"  "========= First Time Boot ========="
+#webui_print_success "-" "Early-boot system copied to RAM."
+#webui_print_success "-" "Early-boot WebUI up and running."
 
 echo "IS_FIRSBOOT = $IS_FIRSBOOT"
 
@@ -68,6 +87,7 @@ if [ "$DEBUG_CONSOLE" == "1" ]; then
 fi
 
 if [ "$IS_FIRSBOOT" == "1" ]; then
+	webui_print_simple "-"  "========= First Time Boot ========="
 	# Custom commands
 	custom_firstboot_begin
 	
@@ -95,6 +115,7 @@ if [ "$IS_FIRSBOOT" == "1" ]; then
 		sed -i /mnt/boot/cmdline.txt -e 's/colibri.firstboot=1/colibri.firstboot=0/'
 	fi
 	
+	sync
 	# Boot partition is not used anymore
 	umount /mnt/boot
 	# Set firstboot indication for application's system firstboot handling
@@ -103,6 +124,21 @@ if [ "$IS_FIRSBOOT" == "1" ]; then
 	# Custom commands
 	custom_firstboot_end
 else
+	if is_recovery_gpio_active || custom_recovery_condition; then
+		webui_print_simple "-"  "========= Recovery ========="
+		USER_ACTION=$(webui_waitfor_response "Full Reinstall:1|Light Reinstall:2|Boot:3")
+		case $USER_ACTION in
+			1)
+				;;
+			2)
+				;;
+			3)
+				;;
+			*)
+				;;
+		esac
+	fi
+	webui_print_simple "-"  "========= Boot ========="
 	mount_partitions $DISK
 	# Boot partition is not used anymore
 	umount /mnt/boot

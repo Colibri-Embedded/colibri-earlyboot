@@ -1,7 +1,25 @@
+########################################################################
+#
+#  This file is part of colibri-earlyboot.
+#  
+#  Copyright (C) 2016	Daniel Kesler <kesler.daniel@gmail.com>
+#  
+#  Foobar is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
+#  
+#  Foobar is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+#
+########################################################################
+
 . /lib/.config
-#WEBUI_DB="/run/webui.db"
-#WEBUI_FIFO="/run/webui.fifo"
-#WEBUI_BFIFO="/run/webui.bfifo"
 
 # Generate MIME header
 echo "Content-type: text/plain"
@@ -84,17 +102,19 @@ for item in $(cat $WEBUI_DB| sed 's/ /%20%/g'); do
 			echo "<div id=\"item${IID}\"><i class=\"fa fa-info-circle\"></i> $V</div>"
 			;;
 		-)
-		echo "<div id=\"item${IID}\">$V</div>"
+			echo "<div id=\"item${IID}\">$V</div>"
 			;;
 		# Skip comments
 		\#*)
+			;;
+		redirect)
+			#echo "<button class=\"pure-button pure-button-primary\" onmouseup=\"webuiRedirect('$V')\">REDIRECT</button>"
+			echo "<!-- redirect: $V -->"
 			;;
 		*)
 			echo "<div>$item</div>"
 			;;
 	esac
 done
-
-#date
 
 #dmesg | sed ':a;N;$!ba;s/\n/<br>/g'
