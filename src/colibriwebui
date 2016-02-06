@@ -41,6 +41,22 @@ cleanup_webui()
 	rm -f $WEBUI_DB
 }
 
+webui_redirect()
+{
+	PREFIX="redirect"
+	URL="$1"
+	TIMEOUT="$2"
+	
+	ITEM="${URL}|${TIMEOUT}"
+	
+	IID=$(awk 'END{print FNR}' $WEBUI_DB)
+	if [ "$IID" != "0" ]; then
+		let "IID--"
+	fi
+	echo "$IID@${PREFIX}::${ITEM}" >> $WEBUI_DB
+	echo $IID	
+}
+
 webui_print()
 {
 	IID="$2"

@@ -76,7 +76,7 @@ init_network
 init_webui
 init_uart
 
-webui_print_success "-" "Colibri Kit init [colibri-embedded.github.io]"
+webui_print_success "-" "Colibri Kit [colibri-embedded.github.io]"
 #webui_print_success "-" "Early-boot system copied to RAM."
 #webui_print_success "-" "Early-boot WebUI up and running."
 
@@ -94,7 +94,7 @@ if [ "$IS_FIRSBOOT" == "1" ]; then
 	#webui_print_question "-"  "Choose further action:"
 	FIRST_FORMAT=$(webui_waitfor_response "Install:1")
 
-	webui_print_simple "-"  "========= System Preparations Started ========="
+	#webui_print_simple "-"  "========= System Preparations Started ========="
 	prepare_partitions $DISK
 	
 	msg_id=$(webui_print_working "-" "Mounting partitions...")
@@ -126,22 +126,75 @@ if [ "$IS_FIRSBOOT" == "1" ]; then
 else
 	if is_recovery_gpio_active || custom_recovery_condition; then
 		webui_print_simple "-"  "========= Recovery ========="
-		USER_ACTION=$(webui_waitfor_response "Full Reinstall:1|Light Reinstall:2|Boot:3")
+		# Custom commands
+		custom_recovery_begin
+		
+		RECOVERY_ABORTED=0
+		
+		USER_ACTION=$(webui_waitfor_response "Reinstall:1|Boot:3")
 		case $USER_ACTION in
-			1)
+			1) # Full reinstall
+				webui_print_simple "-"  "Reinstalling System"
+				#check_partition_table
+				format_partitions $DISK
+				
+				msg_id=$(webui_print_working "-" "Mounting partitions...")
+				mount_partitions $DISK
+				webui_print_success $msg_id "Partitions mounted."	
+				
+				msg_id=$(webui_print_working "-" "Copying bundles from recovery partition...")
+				cp $MOUNTBASE/boot/bundles/* $BUNDLES/
+				sync
+				sleep 1
+				webui_print_success $msg_id "Copy bundles from recovery partition."	
+				
+				
+				# turn off FIRSTBOOT
+				if is_this_qemu; then
+					sed -i /mnt/boot/cmdline.txt.qemu -e 's/colibri.firstboot=1/colibri.firstboot=0/'
+				else
+					sed -i /mnt/boot/cmdline.txt -e 's/colibri.firstboot=1/colibri.firstboot=0/'
+				fi
+				
+				sync
+				# Boot partition is not used anymore
+				umount /mnt/boot
+				# Set firstboot indication for application's system firstboot handling
+				echo "This file indicates that we are booting for the first time" > /lib/firstboot
 				;;
-			2)
+			2) # Light Reinstall
+				webui_print_simple "-"  "TODO"
 				;;
 			3)
+				RECOVERY_ABORTED=1
 				;;
 			*)
+				RECOVERY_ABORTED=1
 				;;
 		esac
+		
+		# Custom commands
+		if [ "$RECOVERY_ABORTED" == "1" ]; then
+			mount_partitions $DISK
+			# Boot partition is not used anymore
+			umount /mnt/boot
+			
+			custom_normal_end
+		else
+			custom_recovery_end
+		fi
+	else
+		# Custom commands
+		custom_normal_begin
+		
+		webui_print_simple "-"  "========= Boot ========="
+		mount_partitions $DISK
+		# Boot partition is not used anymore
+		umount /mnt/boot
+		
+		# Custom commands
+		custom_normal_end
 	fi
-	webui_print_simple "-"  "========= Boot ========="
-	mount_partitions $DISK
-	# Boot partition is not used anymore
-	umount /mnt/boot
 fi
 
 mkdir "$UNION"

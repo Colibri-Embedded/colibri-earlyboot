@@ -108,7 +108,6 @@ for item in $(cat $WEBUI_DB| sed 's/ /%20%/g'); do
 		\#*)
 			;;
 		redirect)
-			#echo "<button class=\"pure-button pure-button-primary\" onmouseup=\"webuiRedirect('$V')\">REDIRECT</button>"
 			echo "<!-- redirect: $V -->"
 			;;
 		*)

@@ -439,8 +439,9 @@ fstype_to_partition_type()
 	esac
 }
 
-# @param $1 device name
-# @param $2 partitioni number
+## @fn devname_to_partition()
+## @param $1 device name
+## @param $2 partitioni number
 devname_to_partition()
 {	
 	if [ $(echo "$1" | grep -E "^/dev/sd[a-z]$") ]; then
@@ -455,9 +456,44 @@ devname_to_partition()
 	fi
 }
 
-prepare_partitions()
+## @fn devname_to_partition()
+## Check whether the partition table has been created. 
+##
+## @param $1 Disk device.
+##
+check_partition_table()
 {
-	DISK=$1
+	RESULT="y"
+	
+	for P in $PARTITIONS; do
+		PR=$(echo $P | awk 'BEGIN{FS=":"};{print $5}')
+		FS=$(echo $P | awk 'BEGIN{FS=":"};{print $3}')
+				
+		PART_SIZE=$(echo $PR | awk 'BEGIN{FS=","};{print $1}')
+		PART_FS=$(echo $FS | awk 'BEGIN{FS=","};{print $1}')
+		PART_LABEL=$(echo $P | awk 'BEGIN{FS=":"};{print $4}')
+		PART_NUM=$(echo $P | awk 'BEGIN{FS=":"};{print $1}')
+		
+		PART_DEV=$(devname_to_partition $1 $PART_NUM)
+		
+		if [ ! -e "${PART_DEV}" ]; then
+			RESULT="n"
+		fi
+	done
+	
+	if [ "x$RESULT" == "xy" ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+#
+# @param $1 Disk device.
+#
+create_partitions()
+{
+	#DISK=$1
 	# Disk repartitioning (fdisk)
 	FDISK_CMD=""
 
@@ -482,11 +518,11 @@ prepare_partitions()
 		PART_LABEL=$(echo $P | awk 'BEGIN{FS=":"};{print $4}')
 		PART_NUM=$(echo $P | awk 'BEGIN{FS=":"};{print $1}')
 		PART_TYPE=$(echo $P | awk 'BEGIN{FS=":"};{print $2}')
-		PART_DEV=$(devname_to_partition $DISK $PART_NUM)
+		PART_DEV=$(devname_to_partition $1 $PART_NUM)
 		
-		echo "DEBUG [$P]"
-		echo "DEBUG sz: $PART_SIZE, fs: $PART_FS, lbl: $PART_LABEL, nm: $PART_NUM, tp: $PART_TYPE"
-		echo "DEBUG dev: $PART_DEV"
+		#echo "DEBUG [$P]"
+		#echo "DEBUG sz: $PART_SIZE, fs: $PART_FS, lbl: $PART_LABEL, nm: $PART_NUM, tp: $PART_TYPE"
+		#echo "DEBUG dev: $PART_DEV"
 		
 		if [ "$DO_RESIZE" == "yes" ]; then
 			msg_id=$(webui_print_working "-" "Resizing \"$PART_LABEL\" partition...")
@@ -524,7 +560,7 @@ prepare_partitions()
 
 	msg_id=$(webui_print_working "-" "Creating system partitions...")
 	echo -n $FDISK_CMD | sed 's/:/\n/g' > /tmp/cmds 
-	fdisk -u $DISK < /tmp/cmds &> /dev/null
+	fdisk -u $1 < /tmp/cmds &> /dev/null
 	rm /tmp/cmds
 	webui_print_success $msg_id "Create system partitions."
 	
@@ -534,7 +570,13 @@ prepare_partitions()
 	mdev -s
 	sleep 2
 	webui_print_success $msg_id "Update block devices."
-	
+}
+
+#
+# @param $1 Disk device.
+#
+format_partitions()
+{
 	for P in $PARTITIONS; do
 		PR=$(echo $P | awk 'BEGIN{FS=":"};{print $5}')
 		FS=$(echo $P | awk 'BEGIN{FS=":"};{print $3}')
@@ -553,13 +595,21 @@ prepare_partitions()
 		if [ "$DONOT_FORMAT" != "yes" ]; then
 			if [ "$PART_FS" != "-" ]; then
 				msg_id=$(webui_print_working "-" "Formating $PART_LABEL partition...")
-				format_parition $(devname_to_partition $DISK $PART_NUM) $PART_LABEL $PART_FS
+				format_parition $(devname_to_partition $1 $PART_NUM) $PART_LABEL $PART_FS
 				webui_print_success $msg_id "Format \"$PART_LABEL\" partition."
 			fi
 		fi
 		
 	done
+}
 
+#
+# @param $1 Disk device.
+#
+prepare_partitions()
+{
+	create_partitions $1
+	format_partitions $1
 }
 
 mount_partitions()
