@@ -109,11 +109,11 @@ if [ "$IS_FIRSBOOT" == "1" ]; then
 	
 	
 	# turn off FIRSTBOOT
-	if is_this_qemu; then
-		sed -i /mnt/boot/cmdline.txt.qemu -e 's/colibri.firstboot=1/colibri.firstboot=0/'
-	else
+	#~ if is_this_qemu; then
+		#~ sed -i /mnt/boot/cmdline.txt.qemu -e 's/colibri.firstboot=1/colibri.firstboot=0/'
+	#~ else
 		sed -i /mnt/boot/cmdline.txt -e 's/colibri.firstboot=1/colibri.firstboot=0/'
-	fi
+	#~ fi
 	
 	sync
 	# Boot partition is not used anymore
@@ -162,10 +162,10 @@ else
 				# Set firstboot indication for application's system firstboot handling
 				echo "This file indicates that we are booting for the first time" > /lib/firstboot
 				;;
-			2) # Light Reinstall
+			2) # Lite Reinstall
 				webui_print_simple "-"  "TODO"
 				;;
-			3)
+			3) # Boot
 				RECOVERY_ABORTED=1
 				;;
 			*)
@@ -179,7 +179,7 @@ else
 			# Boot partition is not used anymore
 			umount /mnt/boot
 			
-			custom_normal_end
+			custom_recovery_aborted
 		else
 			custom_recovery_end
 		fi
