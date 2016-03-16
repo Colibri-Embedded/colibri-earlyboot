@@ -19,5 +19,9 @@ UNION=$MEMORY/union
 BDATA=$MEMORY/bdata
 BEXT=cb
 
+# System Options
+TMP_SIZE_LIMIT="256M"
+RUN_SIZE_LIMIT="16M"
+
 # UART
 UART_TMP=/tmp/uart_response

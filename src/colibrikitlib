@@ -88,13 +88,16 @@ union_append_bundles()
 fstab_create()
 {
 	local FSTAB
+	local DISK
 	FSTAB="$1/etc/fstab"
+	DISK="$2"
+	
 	echo "# Automaticaly generated fstab by Colibri early-boot" > $FSTAB
 	echo aufs / aufs defaults 0 0 >> $FSTAB
 	echo proc /proc proc defaults 0 0 >> $FSTAB
 	echo sysfs /sys sysfs defaults 0 0 >> $FSTAB
-	echo tmpfs /run	tmpfs defaults 0 0  >> $FSTAB
-	echo tmpfs /tmp	tmpfs defaults 0 0  >> $FSTAB
+	echo tmpfs /run	tmpfs rw,nodev,nosuid,size=${RUN_SIZE_LIMIT} 0 0  >> $FSTAB
+	echo tmpfs /tmp	tmpfs rw,nodev,nosuid,noexec,size=${TMP_SIZE_LIMIT} 0 0  >> $FSTAB
 	echo devpts /dev/pts devpts gid=5,mode=620 0 0 >> $FSTAB
 	echo tmpfs /dev/shm tmpfs defaults 0 0 >> $FSTAB
 	
@@ -115,6 +118,28 @@ fstab_create()
 	echo "umount /sys"  >> $FSUMOUNT
 	echo "umount /proc"  >> $FSUMOUNT
 	chmod +x $FSUMOUNT
+	
+	# Extra partitions
+	for P in $PARTITIONS; do
+		PR=$(echo $P | awk 'BEGIN{FS=":"};{print $5}')
+		FS=$(echo $P | awk 'BEGIN{FS=":"};{print $3}')
+		
+		PART_FSTYPE=$(to_lower $(echo $FS | awk 'BEGIN{FS=","};{print $1}'))
+		PART_LABEL=$(echo $P | awk 'BEGIN{FS=":"};{print $4}')
+		PART_NUM=$(echo $P | awk 'BEGIN{FS=":"};{print $1}')
+		PART_DEV=$(devname_to_partition $DISK $PART_NUM)
+		
+		if has_tag $FS "fstab"; then
+			MNT=/mnt/${PART_LABEL}
+			mkdir -p "$1/${MNT}"
+			
+			echo ${PART_DEV} ${MNT} ${PART_FSTYPE} defaults 0 0 >> $FSTAB
+			echo "mount ${MNT}" >> $FSMOUNT
+			echo "mount ${MNT}" >> $FSUMOUNT
+		fi
+	done
+	
+	
 }
 
 # Change root and execute init
@@ -456,6 +481,22 @@ devname_to_partition()
 	fi
 }
 
+## @fn has_tag()
+## Check whether the comma separated list contains a tag.
+##
+## @param $1 Comma separated list.
+## @param $2 Tag to look for.
+##
+has_tag()
+{
+	for tag in $(echo $1 | sed -e 's/,/ /g'); do
+		if [ "x$tag" == "x$2" ]; then
+			return 0
+		fi
+	done
+	return 1
+}
+
 ## @fn devname_to_partition()
 ## Check whether the partition table has been created. 
 ##
@@ -501,15 +542,13 @@ create_partitions()
 		PR=$(echo $P | awk 'BEGIN{FS=":"};{print $5}')
 		FS=$(echo $P | awk 'BEGIN{FS=":"};{print $3}')
 		
-		T=$(echo $PR | awk 'BEGIN{FS=","};{print $2}')
 		DO_RESIZE="no"
-		if [ "x$T" == "xresize" ]; then
+		if has_tag $PR "resize"; then
 			DO_RESIZE="yes"
 		fi
 		
-		T=$(echo $FS | awk 'BEGIN{FS=","};{print $2}')
 		DONOT_FORMAT="no"
-		if [ "x$T" == "xnoformat" ]; then
+		if has_tag $FS "noformat"; then
 			DONOT_FORMAT="yes"
 		fi
 		
@@ -583,7 +622,7 @@ format_partitions()
 		
 		T=$(echo $FS | awk 'BEGIN{FS=","};{print $2}')
 		DONOT_FORMAT="no"
-		if [ "x$T" == "xnoformat" ]; then
+		if has_tag $FS "noformat"; then
 			DONOT_FORMAT="yes"
 		fi
 		
@@ -620,25 +659,45 @@ mount_partitions()
 		PR=$(echo $P | awk 'BEGIN{FS=":"};{print $5}')
 		FS=$(echo $P | awk 'BEGIN{FS=":"};{print $3}')
 		
-		T=$(echo $FS | awk 'BEGIN{FS=","};{print $2}')
 		DONOT_MOUNT="no"
-		if [ "x$T" == "xfstab" ]; then
+		if has_tag $FS "fstab"; then
 			DONOT_MOUNT="yes"
 		fi
+
+		READONLY="no"
+		if has_tag $FS "ro"; then
+			READONLY="yes"
+		fi
 		
-		#PART_SIZE=$(echo $PR | awk 'BEGIN{FS=","};{print $1}')
+		NOATIME="no"
+		if has_tag $FS "noatime"; then
+			NOATIME="yes"
+		fi
+		
 		PART_FS=$(echo $FS | awk 'BEGIN{FS=","};{print $1}')
 		PART_LABEL=$(echo $P | awk 'BEGIN{FS=":"};{print $4}')
 		PART_NUM=$(echo $P | awk 'BEGIN{FS=":"};{print $1}')
-		#PART_TYPE=$(echo $P | awk 'BEGIN{FS=":"};{print $2}')
 		
 		if [ "$PART_FS" != "-" ]; then
 		
 			if [ "$DONOT_MOUNT" == "no" ]; then		
 				MNT="$MOUNTBASE/$PART_LABEL"
+				OPT=""
+				
+				if [ "$READONLY" == "yes" ]; then
+					OPT="-o ro"
+				fi
+				
+				if [ "$NOATIME" == "yes" ]; then
+					if [ "x$OPT" == "x" ]; then
+						OPT="-o noatime"
+					else
+						OPT="$OPT,noatime"
+					fi
+				fi
 				
 				mkdir $MNT
-				mount $(devname_to_partition $DISK $PART_NUM) $MNT
+				mount $(devname_to_partition $DISK $PART_NUM) $OPT $MNT
 			fi
 		
 		fi

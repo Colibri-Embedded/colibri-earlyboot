@@ -117,7 +117,8 @@ if [ "$IS_FIRSBOOT" == "1" ]; then
 	
 	sync
 	# Boot partition is not used anymore
-	umount /mnt/boot
+	# Remount the boot partition as read-only
+	mount $BOOTPART -o remount,ro /mnt/boot
 	# Set firstboot indication for application's system firstboot handling
 	echo "This file indicates that we are booting for the first time" > /lib/firstboot
 	
@@ -158,7 +159,8 @@ else
 				
 				sync
 				# Boot partition is not used anymore
-				umount /mnt/boot
+				# Remount the boot partition as read-only
+				mount $BOOTPART -o remount,ro /mnt/boot
 				# Set firstboot indication for application's system firstboot handling
 				echo "This file indicates that we are booting for the first time" > /lib/firstboot
 				;;
@@ -177,7 +179,8 @@ else
 		if [ "$RECOVERY_ABORTED" == "1" ]; then
 			mount_partitions $DISK
 			# Boot partition is not used anymore
-			umount /mnt/boot
+			# Remount the boot partition as read-only
+			mount $BOOTPART -o remount,ro /mnt/boot
 			
 			custom_recovery_aborted
 		else
@@ -190,7 +193,8 @@ else
 		webui_print_simple "-"  "========= Boot ========="
 		mount_partitions $DISK
 		# Boot partition is not used anymore
-		umount /mnt/boot
+		# Remount the boot partition as read-only
+		mount $BOOTPART -o remount,ro /mnt/boot
 		
 		# Custom commands
 		custom_normal_end
@@ -211,7 +215,7 @@ cleanup_webui
 cleanup_network
 cleanup_proc_sysfs
 
-fstab_create "$UNION"
+fstab_create "$UNION" "$DISK"
 
 change_root "$UNION"
 
