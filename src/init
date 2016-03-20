@@ -63,7 +63,7 @@ if [ -f /mnt/boot/earlyboot/webui.tar ]; then
 fi
 # Unmount boot partition
 umount $BOOTPART
-rm -rf /mnt/boot
+#rm -rf /mnt/boot
 
 . /lib/.config
 . /lib/.user_config
@@ -102,7 +102,11 @@ if [ "$IS_FIRSBOOT" == "1" ]; then
 	webui_print_success $msg_id "Partitions mounted."	
 	
 	msg_id=$(webui_print_working "-" "Copying bundles from recovery partition...")
+	
+	mount -o rw,remount $BUNDLES
 	cp $MOUNTBASE/boot/bundles/* $BUNDLES/
+	mount -o ro,remount $BUNDLES
+	
 	sync
 	sleep 1
 	webui_print_success $msg_id "Copy bundles from recovery partition."	
@@ -112,6 +116,7 @@ if [ "$IS_FIRSBOOT" == "1" ]; then
 	#~ if is_this_qemu; then
 		#~ sed -i /mnt/boot/cmdline.txt.qemu -e 's/colibri.firstboot=1/colibri.firstboot=0/'
 	#~ else
+		mount $BOOTPART -o rw,remount /mnt/boot
 		sed -i /mnt/boot/cmdline.txt -e 's/colibri.firstboot=1/colibri.firstboot=0/'
 	#~ fi
 	
