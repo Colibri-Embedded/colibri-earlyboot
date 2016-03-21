@@ -75,12 +75,11 @@ sleep $BOOT_DELAY
 init_network
 init_webui
 init_uart
+init_gpio
 
 webui_print_success "-" "Colibri Kit [colibri-embedded.github.io]"
 #webui_print_success "-" "Early-boot system copied to RAM."
 #webui_print_success "-" "Early-boot WebUI up and running."
-
-echo "IS_FIRSBOOT = $IS_FIRSBOOT"
 
 if [ "$DEBUG_CONSOLE" == "1" ]; then
 	/bin/bash
@@ -88,6 +87,7 @@ fi
 
 if [ "$IS_FIRSBOOT" == "1" ]; then
 	webui_print_simple "-"  "========= First Time Boot ========="
+	echo "========= First Time Boot ========="
 	# Custom commands
 	custom_firstboot_begin
 	
@@ -103,6 +103,7 @@ if [ "$IS_FIRSBOOT" == "1" ]; then
 	
 	msg_id=$(webui_print_working "-" "Copying bundles from recovery partition...")
 	
+	# Mount bundles partition read-write
 	mount -o rw,remount $BUNDLES
 	cp $MOUNTBASE/boot/bundles/* $BUNDLES/
 	mount -o ro,remount $BUNDLES
@@ -113,12 +114,8 @@ if [ "$IS_FIRSBOOT" == "1" ]; then
 	
 	
 	# turn off FIRSTBOOT
-	#~ if is_this_qemu; then
-		#~ sed -i /mnt/boot/cmdline.txt.qemu -e 's/colibri.firstboot=1/colibri.firstboot=0/'
-	#~ else
-		mount $BOOTPART -o rw,remount /mnt/boot
-		sed -i /mnt/boot/cmdline.txt -e 's/colibri.firstboot=1/colibri.firstboot=0/'
-	#~ fi
+	mount $BOOTPART -o rw,remount /mnt/boot
+	sed -i /mnt/boot/cmdline.txt -e 's/colibri.firstboot=1/colibri.firstboot=0/'
 	
 	sync
 	# Boot partition is not used anymore
@@ -132,6 +129,7 @@ if [ "$IS_FIRSBOOT" == "1" ]; then
 else
 	if is_recovery_gpio_active || custom_recovery_condition; then
 		webui_print_simple "-"  "========= Recovery ========="
+		echo  "========= Recovery ========="
 		# Custom commands
 		custom_recovery_begin
 		
@@ -156,11 +154,11 @@ else
 				
 				
 				# turn off FIRSTBOOT
-				if is_this_qemu; then
-					sed -i /mnt/boot/cmdline.txt.qemu -e 's/colibri.firstboot=1/colibri.firstboot=0/'
-				else
-					sed -i /mnt/boot/cmdline.txt -e 's/colibri.firstboot=1/colibri.firstboot=0/'
-				fi
+				#~ if is_this_qemu; then
+					#~ sed -i /mnt/boot/cmdline.txt.qemu -e 's/colibri.firstboot=1/colibri.firstboot=0/'
+				#~ else
+					#~ sed -i /mnt/boot/cmdline.txt -e 's/colibri.firstboot=1/colibri.firstboot=0/'
+				#~ fi
 				
 				sync
 				# Boot partition is not used anymore
@@ -215,6 +213,7 @@ init_union "$CHANGES" "$UNION"
 # add data to union
 union_append_bundles "$BUNDLES" "$BDATA" "$UNION"
 
+cleanup_gpio
 cleanup_uart
 cleanup_webui
 cleanup_network

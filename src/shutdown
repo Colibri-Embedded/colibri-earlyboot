@@ -29,8 +29,8 @@ export PATH=.:/:/usr/sbin:/usr/bin:/sbin:/bin
 
 RC=$(cat /run/rc.earlyboot)
 
-if [ "$RC" == "shutdown" ]; then
-	/bin/bash
+if [ "$RC" == "poweroff" ]; then
+	/sbin/poweroff -f
 elif [ "$RC" == "reboot" ]; then
 	change_root "$UNION"
 elif [ "$RC" == "update" ]; then

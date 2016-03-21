@@ -135,11 +135,11 @@ fstab_create()
 			
 			echo ${PART_DEV} ${MNT} ${PART_FSTYPE} defaults 0 0 >> $FSTAB
 			
-			echo "mkdir -p ${MNT}" >> $FSMOUNT
-			echo "mount ${MNT}" >> $FSMOUNT
+			#echo "mkdir -p ${MNT}" >> $FSMOUNT
+			#echo "mount ${MNT}" >> $FSMOUNT
 			
-			echo "mount ${MNT}" >> $FSUMOUNT
-			echo "rm -rf ${MNT}" >> $FSUMOUNT
+			#echo "umount ${MNT}" >> $FSUMOUNT
+			#echo "rm -rf ${MNT}" >> $FSUMOUNT
 		fi
 	done
 	
@@ -701,7 +701,7 @@ mount_partitions()
 					fi
 				fi
 				
-				mkdir $MNT
+				mkdir -p $MNT
 				mount $PART_DEV $OPT $MNT
 			fi
 		
