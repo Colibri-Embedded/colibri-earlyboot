@@ -215,6 +215,14 @@ is_recovery_gpio_active()
 	if [ "x$RECOVERY_PIN" != "xno" ]; then
 		GPIO_DIR="gpio$RECOVERY_PIN"
 		V=$(cat /sys/class/gpio/$GPIO_DIR/value)
+		
+		# work around for QEMU PL061 gpio
+		# as it cannot be controled from outside we must not use
+		# the "0" value as it will always trigger recovery
+		if is_this_qemu; then
+			RECOVERY_ACTIVE="1"
+		fi
+		
 		if [ "$V" == "$RECOVERY_ACTIVE" ]; then
 			# Return true if recovery pin state is equal to active state
 			return 0
