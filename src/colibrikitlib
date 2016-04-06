@@ -5,12 +5,12 @@
 #  
 #  Copyright (C) 2016	Daniel Kesler <kesler.daniel@gmail.com>
 #  
-#  Foobar is free software: you can redistribute it and/or modify
+#  colibri-earlyboot is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
 #  the Free Software Foundation, either version 3 of the License, or
 #  (at your option) any later version.
 #  
-#  Foobar is distributed in the hope that it will be useful,
+#  colibri-earlyboot is distributed in the hope that it will be useful,
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
@@ -103,22 +103,16 @@ fstab_create()
 	
 	FSMOUNT="$1/etc/init.d/earlyboot.mount"
 	echo "#/bin/bash" > $FSMOUNT
+	
+	FSUMOUNT="$1/etc/init.d/earlyboot.umount"
+	echo "#/bin/bash" > $FSUMOUNT
+	
 	echo "mount /tmp" >> $FSMOUNT
 	echo "mount /run" >> $FSMOUNT
 	echo "mount /dev/pts" >> $FSMOUNT
 	echo "mount /dev/shm" >> $FSMOUNT
 	chmod +x $FSMOUNT
-	
-	FSUMOUNT="$1/etc/init.d/earlyboot.umount"
-	echo "#/bin/bash" > $FSUMOUNT
-	echo "umount /tmp" >> $FSUMOUNT
-	echo "umount /run" >> $FSUMOUNT
-	echo "umount /dev/pts" >> $FSUMOUNT
-	echo "umount /dev/shm" >> $FSUMOUNT
-	echo "umount /sys"  >> $FSUMOUNT
-	echo "umount /proc"  >> $FSUMOUNT
-	chmod +x $FSUMOUNT
-	
+		
 	# Extra partitions
 	for P in $PARTITIONS; do
 		PR=$(echo $P | awk 'BEGIN{FS=":"};{print $5}')
@@ -135,14 +129,24 @@ fstab_create()
 			
 			echo ${PART_DEV} ${MNT} ${PART_FSTYPE} defaults 0 0 >> $FSTAB
 			
-			#echo "mkdir -p ${MNT}" >> $FSMOUNT
-			#echo "mount ${MNT}" >> $FSMOUNT
-			
-			#echo "umount ${MNT}" >> $FSUMOUNT
-			#echo "rm -rf ${MNT}" >> $FSUMOUNT
+			if ! is_this_qemu; then
+				echo "mkdir -p ${MNT}" >> $FSMOUNT
+				echo "mount ${MNT}" >> $FSMOUNT
+				
+				echo "umount ${MNT}" >> $FSUMOUNT
+				echo "rm -rf ${MNT}" >> $FSUMOUNT
+			fi
 		fi
 	done
 	
+	
+	echo "umount /tmp" >> $FSUMOUNT
+	echo "umount /run" >> $FSUMOUNT
+	echo "umount /dev/pts" >> $FSUMOUNT
+	echo "umount /dev/shm" >> $FSUMOUNT
+	echo "umount /sys"  >> $FSUMOUNT
+	echo "umount /proc"  >> $FSUMOUNT
+	chmod +x $FSUMOUNT
 	
 }
 
@@ -258,7 +262,7 @@ init_uart()
 # @return read content
 write_uart()
 {	
-	ebuart -d $UART_DEV -b $UART_BAUD -t "$1"
+	ebuart -d $UART_DEV -b $UART_BAUD "$1"
 }
 
 # Cleanup UART settings
