@@ -32,6 +32,8 @@ RC=$(cat /run/rc.earlyboot)
 if [ "$RC" == "poweroff" ]; then
 	/sbin/poweroff -f
 elif [ "$RC" == "reboot" ]; then
+	/sbin/reboot -f
+elif [ "$RC" == "soft-reboot" ]; then
 	change_root "$UNION"
 elif [ "$RC" == "update" ]; then
 	# umount bundles
