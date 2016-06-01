@@ -207,6 +207,13 @@ mkdir "$BDATA"
 # init aufs union
 init_union "$CHANGES" "$UNION"
 
+# execute postponed operations
+# Remount the boot partitions as read-write
+mount $BOOTPART -o remount,rw /mnt/boot
+rearrange_bundles "$BUNDLES"
+# Remount the boot partitions as read-only
+mount $BOOTPART -o remount,ro /mnt/boot
+
 # add data to union
 union_append_bundles "$BUNDLES" "$BDATA" "$UNION"
 

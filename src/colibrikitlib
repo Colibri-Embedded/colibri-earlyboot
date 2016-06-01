@@ -54,13 +54,13 @@ transfer_initramfs()
 #
 init_union()
 {
-   #debug_log "init_union" "$*"
+	#debug_log "init_union" "$*"
 
-   echo_green_star
-   echo "Setting up union using AUFS 3"
-   mkdir -p "$1"
-   mkdir -p "$2"
-   mount -t aufs -o xino="/.xino",br="$1" aufs "$2"
+	echo_green_star
+	echo "Setting up union using AUFS 3"
+	mkdir -p "$1"
+	mkdir -p "$2"
+	mount -t aufs -o xino="/.xino",br="$1" aufs "$2"
 }
 
 # Mount squashfs filesystem bundles
@@ -71,15 +71,37 @@ init_union()
 #
 union_append_bundles()
 {
-   #debug_log "union_append_bundles" "$*"
-   echo_green_star
-   echo "Adding bundles to union"
-   ls -1 "$1" | grep '.'$BEXT'$' | sort | while read BUNDLE; do
-      echo "* $BUNDLE"
-      mkdir -p "$2/$BUNDLE"
-      mount -o loop -t squashfs "$1/$BUNDLE" "$2/$BUNDLE"
-      mount -o remount,add:1:"$2/$BUNDLE" aufs "$3"
-   done
+	#debug_log "union_append_bundles" "$*"
+	echo_green_star
+	echo "Adding bundles to union"
+	ls -1 "$1" | grep '.'$BEXT'$' | sort | while read BUNDLE; do
+		if [ ! -f "$1/${BUNDLE}.skip" ]; then
+			echo "* $BUNDLE"
+			mkdir -p "$2/$BUNDLE"
+			mount -o loop -t squashfs "$1/$BUNDLE" "$2/$BUNDLE"
+			mount -o remount,add:1:"$2/$BUNDLE" aufs "$3"
+		fi
+	done
+}
+
+# Execute postponed bundle operations
+# @param $1 = directory where to search for bundles
+rearrange_bundles()
+{
+	echo_green_star
+	echo "Rearranging bundles"
+	ls -1 "$1" | grep '.'$BEXT'$' | sort | while read BUNDLE; do
+		if [ -f "$1/${BUNDLE}.remove" ]; then
+			echo "* removing $BUNDLE"
+			rm -f "$1/$BUNDLE"
+			rm -f "$1/${BUNDLE}.remove"
+		fi
+		
+		if [ -f "$1/${BUNDLE}.overwrite" ]; then
+			echo "* overwriting $BUNDLE"
+			mv "$1/${BUNDLE}.overwrite" "$1/${BUNDLE}"
+		fi
+	done
 }
 
 # Create empty fstab properly
