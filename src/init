@@ -49,6 +49,9 @@ BOOTPART=$(devname_to_partition $DISK 1)
 
 sleep 1
 
+# check boot partition and repair small errors
+fsck.fat -a -w $BOOTPART
+
 # Mount boot partition as read-only
 mkdir -p /mnt/boot
 mount $BOOTPART -o ro /mnt/boot
@@ -128,20 +131,114 @@ if [ "$IS_FIRSBOOT" == "1" ]; then
 	# Custom commands
 	custom_firstboot_end
 else
+	# 
+	# boot partition is fsck-ed at the beginning: skip here
+	#
+	# bundles - should be checked
+	# changes - most dynamic data, should be checked
+	# bigtemp - volatile data, can be reformated in case of failure
+	# userdata - most important data, protect them with your life
+	
+	# Check data integrity
 	if is_recovery_gpio_active || custom_recovery_condition; then
-		webui_print_simple "-"  "========= Recovery ========="
-		echo  "========= Recovery ========="
+		REPORT=""
+		CHECK=0
+	else
+		REPORT=$(check_partitions $DISK)
+		CHECK=$?
+	fi
+	
+	SUGGESTION="no-action"
+
+	# Recovery entry
+	if is_recovery_gpio_active || custom_recovery_condition || [ "${CHECK}" != "0" ]; then
+	
+		if [ x"${CHECK}" == x"0" ]; then
+			webui_print_simple "-"  "========= Recovery ========="
+			echo  "========= Recovery ========="
+		else
+			webui_print_simple "-"  "========= Forced Recovery ========="
+			echo  "========= Forced Recovery ========="
+
+			webui_print_simple "-"  "Report:"
+
+			for rpt in ${REPORT}; do
+				PART_LABEL=$(echo $rpt | awk 'BEGIN{FS=":"};{print $1}')
+				PART_STATE=$(echo $rpt | awk 'BEGIN{FS=":"};{print $2}')
+				
+				case ${PART_STATE} in
+					ok)
+						webui_print_success - "${PART_LABEL}: ok"
+						;;
+					fixed)
+						webui_print_warning - "${PART_LABEL}: fixed"
+						;;
+					formated)
+						webui_print_warning - "${PART_LABEL}: formatted"
+						;;
+					error)
+						webui_print_error - "${PART_LABEL}: corrupted"
+						;;
+					*)
+						;;
+				esac
+				
+				case ${PART_LABEL} in
+					bundles)
+						if [ x"${PART_STATE}" == x"error" ]; then
+							SUGGESTION="restore-bundles"
+						fi
+						;;
+					changes)
+						if [ x"${PART_STATE}" == x"error" ]; then
+							SUGGESTION="lite-reinstall"
+						fi
+						;;
+					userdata)
+						if [ x"${PART_STATE}" == x"error" ]; then
+							SUGGESTION="full-reinstall"
+						fi
+						;;
+					*)
+						;;
+				esac
+				
+			done
+			
+			case ${SUGGESTION} in
+				no-action)
+					webui_print_simple "-"  "Suggestion: No Action"
+					;;
+				restore-bundles)
+					webui_print_simple "-"  "Suggestion: Restore Bundles"
+					;;
+				lite-reinstall)
+					webui_print_simple "-"  "Suggestion: Lite Reinstall"
+					;;
+				full-reinstall)
+					webui_print_simple "-"  "Suggestion: Full Reinstall"
+					;;
+				*)
+					;;
+			esac
+			
+		fi
+		
 		# Custom commands
 		custom_recovery_begin
 		
 		RECOVERY_ABORTED=0
 		
-		USER_ACTION=$(webui_waitfor_response "Reinstall:1|Boot:3")
+		USER_ACTION=$(webui_waitfor_response "Full Reinstall:1|Lite Reinstall:2|Restore Bundles:3|Boot:4")
 		case $USER_ACTION in
 			1) # Full reinstall
-				webui_print_simple "-"  "Reinstalling System"
-				#check_partition_table
-				format_partitions $DISK
+				webui_print_simple "-"  "Factory reinstall"
+				
+				### @TODO: check_partition_table
+				
+				# Force formating of all partition, even those marked as noformat
+				# The only partition that will not be formated is the BOOT partition
+				format_partitions $DISK "yes"
 				
 				msg_id=$(webui_print_working "-" "Mounting partitions...")
 				mount_partitions $DISK
@@ -165,9 +262,59 @@ else
 				echo "This file indicates that we are booting for the first time" > /lib/firstboot
 				;;
 			2) # Lite Reinstall
-				webui_print_simple "-"  "TODO"
+				webui_print_simple "-"  "Lite reinstall"
+				### @TODO: check_partition_table
+				
+				# Format only partitions that are not flagged noformat
+				# This will skip any userdata partitions
+				format_partitions $DISK "no"
+				
+				msg_id=$(webui_print_working "-" "Mounting partitions...")
+				mount_partitions $DISK
+				webui_print_success $msg_id "Partitions mounted."	
+				
+				msg_id=$(webui_print_working "-" "Copying bundles from recovery partition...")
+				
+				# Mount bundles partition read-write
+				mount -o rw,remount $BUNDLES
+				cp $MOUNTBASE/boot/bundles/* $BUNDLES/
+				mount -o ro,remount $BUNDLES
+				
+				sync
+				sleep 1
+				webui_print_success $msg_id "Copy bundles from recovery partition."	
+				
+				# Boot partition is not used anymore
+				# Remount the boot partition as read-only
+				mount $BOOTPART -o remount,ro /mnt/boot
+				# Set firstboot indication for application's system firstboot handling
+				echo "This file indicates that we are booting for the first time" > /lib/firstboot
 				;;
-			3) # Boot
+			3) # Restore bundles
+				webui_print_simple "-"  "TODO"
+				
+				format_partitions $DISK "yes" "bundles"
+				
+				msg_id=$(webui_print_working "-" "Mounting partitions...")
+				mount_partitions $DISK
+				webui_print_success $msg_id "Partitions mounted."	
+				
+				msg_id=$(webui_print_working "-" "Copying bundles from recovery partition...")
+				
+				# Mount bundles partition read-write
+				mount -o rw,remount $BUNDLES
+				cp $MOUNTBASE/boot/bundles/* $BUNDLES/
+				mount -o ro,remount $BUNDLES
+				
+				sync
+				sleep 1
+				webui_print_success $msg_id "Copy bundles from recovery partition."					
+				
+				# Boot partition is not used anymore
+				# Remount the boot partition as read-only
+				mount $BOOTPART -o remount,ro /mnt/boot
+				;;
+			4) # Boot
 				RECOVERY_ABORTED=1
 				;;
 			*)
@@ -186,6 +333,7 @@ else
 		else
 			custom_recovery_end
 		fi
+	# Normal boot entry
 	else
 		# Custom commands
 		custom_normal_begin
@@ -201,18 +349,20 @@ else
 	fi
 fi
 
+# execute postponed operations
+# Remount the bundles partitions as read-write
+mount -o rw,remount $BUNDLES
+
+rearrange_bundles "$BUNDLES"
+
+# Remount the boot partitions as read-only
+mount -o ro,remount $BUNDLES
+
 mkdir "$UNION"
 mkdir "$BDATA"
 
 # init aufs union
 init_union "$CHANGES" "$UNION"
-
-# execute postponed operations
-# Remount the boot partitions as read-write
-mount $BOOTPART -o remount,rw /mnt/boot
-rearrange_bundles "$BUNDLES"
-# Remount the boot partitions as read-only
-mount $BOOTPART -o remount,ro /mnt/boot
 
 # add data to union
 union_append_bundles "$BUNDLES" "$BDATA" "$UNION"

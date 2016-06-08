@@ -29,22 +29,51 @@ export PATH=.:/:/usr/sbin:/usr/bin:/sbin:/bin
 
 RC=$(cat /run/rc.earlyboot)
 
-if [ "$RC" == "poweroff" ]; then
-	/sbin/poweroff -f
-elif [ "$RC" == "reboot" ]; then
-	/sbin/reboot -f
-elif [ "$RC" == "soft-reboot" ]; then
-	change_root "$UNION"
-elif [ "$RC" == "update" ]; then
-	# umount bundles
-	echo "Updating System..."
-	sleep 1
-	# call update_procedure
-	echo "Booting System..."
-	# remount bundles
-	change_root "$UNION"
-elif [ "$RC" == "console" ]; then
-	init_proc_sysfs
-	/bin/bash
-fi
-
+case $RC in
+	poweroff)
+		/sbin/poweroff -f
+		;;
+	reboot)
+		/sbin/reboot -f
+		;;
+	soft-reboot)
+		change_root "$UNION"
+		;;
+	update)
+		
+		init_proc_sysfs
+		# Un-mount all bundles
+		remove_all_bundles
+		
+		echo "Updating System..."
+	
+		# 1) Remount the bundles partitions as read-write
+		mount -o rw,remount $BUNDLES
+		sleep 5
+		# 2) Execute postponed operations
+		rearrange_bundles "$BUNDLES"
+		# 3) Remount the bundles partitions as read-only
+		sleep 2
+		mount -o ro,remount $BUNDLES
+		sleep 5
+		
+		# init aufs union
+		init_union "$CHANGES" "$UNION"
+		# Remount bundles
+		union_append_bundles "$BUNDLES" "$BDATA" "$UNION"
+		
+		echo "Booting System..."
+		cleanup_proc_sysfs
+		
+		change_root "$UNION"
+		;;
+	console)
+		init_proc_sysfs
+		/bin/bash
+		;;
+	*)
+		echo "Unsupported run level"
+		init_proc_sysfs
+		/bin/bash		
+		;;
+esac

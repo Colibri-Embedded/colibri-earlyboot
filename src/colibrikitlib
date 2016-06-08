@@ -84,6 +84,23 @@ union_append_bundles()
 	done
 }
 
+# Umount squashfs filesystem bundles
+# and remove them from union
+#
+remove_all_bundles()
+{
+	# Umount aufs whole union
+	umount -l $UNION
+	echo_green_star
+	echo "Removing bundles from union"
+	ls -1 "${BDATA}" | grep '.'$BEXT'$' | sort | while read BUNDLE; do
+		echo "* $BUNDLE"
+		#mount -t aufs -o remount,verbose,del:"${BDATA}/${BUNDLE}" aufs
+		umount -l ${BDATA}/${BUNDLE}
+		rm -rf ${BDATA}/${BUNDLE}
+	done
+}
+
 # Execute postponed bundle operations
 # @param $1 = directory where to search for bundles
 rearrange_bundles()
@@ -93,13 +110,15 @@ rearrange_bundles()
 	ls -1 "$1" | grep '.'$BEXT'$' | sort | while read BUNDLE; do
 		if [ -f "$1/${BUNDLE}.remove" ]; then
 			echo "* removing $BUNDLE"
-			rm -f "$1/$BUNDLE"
+			rm -f "$1/${BUNDLE}"
+			rm -f "$1/${BUNDLE}.md5sum"
 			rm -f "$1/${BUNDLE}.remove"
 		fi
 		
 		if [ -f "$1/${BUNDLE}.overwrite" ]; then
 			echo "* overwriting $BUNDLE"
 			mv "$1/${BUNDLE}.overwrite" "$1/${BUNDLE}"
+			mv "$1/${BUNDLE}.md5sum.overwrite" "$1/${BUNDLE}.md5sum"
 		fi
 	done
 }
@@ -120,8 +139,9 @@ fstab_create()
 	echo sysfs /sys sysfs defaults 0 0 >> $FSTAB
 	echo tmpfs /run	tmpfs rw,nodev,nosuid,size=${RUN_SIZE_LIMIT} 0 0  >> $FSTAB
 	echo tmpfs /tmp	tmpfs rw,nodev,nosuid,noexec,size=${TMP_SIZE_LIMIT} 0 0  >> $FSTAB
-	echo devpts /dev/pts devpts gid=5,mode=620 0 0 >> $FSTAB
-	echo tmpfs /dev/shm tmpfs defaults 0 0 >> $FSTAB
+	echo none /dev devtmpfs defaults 0 0 >> $FSTAB
+	echo devpts /dev/pts devpts gid=5,mode=620,nosuid,noexec 0 0 >> $FSTAB
+	echo tmpfs /dev/shm tmpfs rw,nosuid,nodev 0 0 >> $FSTAB
 	
 	FSMOUNT="$1/etc/init.d/earlyboot.mount"
 	echo "#/bin/bash" > $FSMOUNT
@@ -131,7 +151,10 @@ fstab_create()
 	
 	echo "mount /tmp" >> $FSMOUNT
 	echo "mount /run" >> $FSMOUNT
+	echo "mkdir -p /dev/pts" >> $FSMOUNT
 	echo "mount /dev/pts" >> $FSMOUNT
+	echo "mkdir -p /dev/shm" >> $FSMOUNT
+	echo "chmod 1777 /dev/shm" >> $FSMOUNT
 	echo "mount /dev/shm" >> $FSMOUNT
 	chmod +x $FSMOUNT
 		
@@ -153,21 +176,22 @@ fstab_create()
 			
 			if ! is_this_qemu; then
 				echo "mkdir -p ${MNT}" >> $FSMOUNT
+				#~ echo "ls /mnt >> /mnt/live/tmp/${PART_LABEL}_mnt.log" >> $FSMOUNT
+				#~ echo "ls /dev >> /mnt/live/tmp/${PART_LABEL}_dev.log" >> $FSMOUNT
 				echo "mount ${MNT}" >> $FSMOUNT
-				
-				echo "umount ${MNT}" >> $FSUMOUNT
-				echo "rm -rf ${MNT}" >> $FSUMOUNT
-			fi
+			fi	
+			echo "umount ${MNT}" >> $FSUMOUNT
+			echo "rm -rf ${MNT}" >> $FSUMOUNT
 		fi
 	done
-	
-	
-	echo "umount /tmp" >> $FSUMOUNT
-	echo "umount /run" >> $FSUMOUNT
-	echo "umount /dev/pts" >> $FSUMOUNT
+
 	echo "umount /dev/shm" >> $FSUMOUNT
+	echo "umount /dev/pts" >> $FSUMOUNT
+	echo "umount /run" >> $FSUMOUNT
+	echo "umount /tmp" >> $FSUMOUNT
 	echo "umount /sys"  >> $FSUMOUNT
 	echo "umount /proc"  >> $FSUMOUNT
+	echo "umount -l /dev"  >> $FSUMOUNT
 	chmod +x $FSUMOUNT
 	
 }
@@ -319,7 +343,8 @@ init_devs()
 {
    #debug_log "init_devs" "$*"
    echo /sbin/mdev > /proc/sys/kernel/hotplug
-   mdev -s
+   #mdev -s
+   mount -t devtmpfs none /dev
    #modprobe zram 2>/dev/null
    #modprobe loop 2>/dev/null
    #modprobe squashfs 2>/dev/null
@@ -428,6 +453,73 @@ resize_partition()
 }
 
 # @param $1 device
+# @param $2 filesystem type name
+# @param $3 autofix
+check_partition()
+{
+	DEV=$1
+	FSTYPE=$(to_lower $2)
+	if [ -z "$3" ]; then
+		AUTOFIX="no"
+	else
+		AUTOFIX="$3"
+	fi
+	
+	case $FSTYPE in
+		fat|vfat|fat32)
+			if [ ${AUTOFIX} == "yes" ]; then
+				echo ">> fsck.fat -a -V -w $DEV" >> /tmp/fsck.log
+				fsck.fat -a -V -w $DEV >> /tmp/fsck.log 2>&1
+				return $?
+			else
+				echo ">> fsck.fat -n $DEV" >> /tmp/fsck.log
+				fsck.fat -n $DEV >> /tmp/fsck.log 2>&1
+				return $?
+			fi
+			;;
+		ext2|ext3|ext4)
+			if [ ${AUTOFIX} == "yes" ]; then
+				echo ">> fsck.$FSTYPE -p $DEV" >> /tmp/fsck.log
+				fsck.$FSTYPE -p $DEV >> /tmp/fsck.log 2>&1
+				return $?
+			else
+				echo ">> fsck.$FSTYPE -n $DEV" >> /tmp/fsck.log
+				fsck.$FSTYPE -n $DEV >> /tmp/fsck.log 2>&1
+				return $?
+			fi
+			;;
+		#~ f2fs)
+			#~ Not stable enough
+			#~ ;;
+		btrfs)
+			if [ ${AUTOFIX} == "yes" ]; then
+				echo ">> btrfs check --check-data-csum --repair" >> /tmp/fsck.log
+				btrfs check --check-data-csum --repair $DEV >> /tmp/fsck.log 2>&1
+				return $?
+			else
+				echo ">> btrfs check --check-data-csum $DEV" >> /tmp/fsck.log
+				btrfs check --check-data-csum $DEV >> /tmp/fsck.log 2>&1
+				return $?
+			fi
+			;;
+		#~ xfs)
+			### @TODO
+			#~ ;;
+		#~ jfs)
+			### @TODO
+			#~ ;;
+		swap)
+			# no need to format
+			return 0
+			;;
+		*)
+			echo "check_partition(): Unsupported filesystem type \"$FSTYPE\""
+			return 1
+			;;
+	esac
+}
+
+# @param $1 device
 # @param $2 label
 # @param $3 filesystem type
 format_parition()
@@ -441,7 +533,7 @@ format_parition()
 			return $?
 			;;
 		ext2|ext3|ext4)
-			mkfs.$FSTYPE -L $LABEL $DEV
+			mkfs.$FSTYPE -F -L $LABEL $DEV
 			return $?
 			;;
 		f2fs)
@@ -567,6 +659,88 @@ check_partition_table()
 	fi
 }
 
+## @fn check_partitions()
+## Check partitions for errors.
+##
+## @param $1 Disk device.
+##
+## @return true, if no errors were found or errors could be autofixed
+##         false, if partitions were corrupted and cannot be fixed
+check_partitions()
+{
+	PART_ERROR="no"
+	
+	for P in $PARTITIONS; do
+		PR=$(echo $P | awk 'BEGIN{FS=":"};{print $5}')
+		FS=$(echo $P | awk 'BEGIN{FS=":"};{print $3}')
+		
+		T=$(echo $FS | awk 'BEGIN{FS=","};{print $2}')
+		DONOT_FORMAT="no"
+		if has_tag $FS "noformat"; then
+			DONOT_FORMAT="yes"
+		fi
+
+		FORMAT_ON_ERROR="no"
+		if has_tag $FS "format_on_error"; then
+			FORMAT_ON_ERROR="yes"
+		fi
+		
+		AUTOFIX="no"
+		if has_tag $FS "autofix"; then
+			AUTOFIX="yes"
+		fi
+		
+		PART_SIZE=$(echo $PR | awk 'BEGIN{FS=","};{print $1}')
+		PART_FS=$(echo $FS | awk 'BEGIN{FS=","};{print $1}')
+		PART_LABEL=$(echo $P | awk 'BEGIN{FS=":"};{print $4}')
+		PART_NUM=$(echo $P | awk 'BEGIN{FS=":"};{print $1}')
+		PART_DEV=$(devname_to_partition $1 $PART_NUM)
+
+		# Skip the boot partition
+		if [[ ${PART_LABEL} != "boot"  && ${PART_FS} != "-" ]]; then
+		
+			#echo "Checking: FS[${PART_FS}], LABEL[${PART_LABEL}], NUM[${PART_NUM}]"  >> /tmp/fsck.log
+		
+			if ! check_partition ${PART_DEV} ${PART_FS} ${AUTOFIX}; then
+				# fsck failed, partition has errors
+				
+				# Try to automatically fix it
+				if ! check_partition ${PART_DEV} ${PART_FS} "yes"; then
+					# Automatic fix failed
+					if [ ${FORMAT_ON_ERROR} == "yes" ]; then
+						format_parition ${PART_DEV} ${PART_LABEL} ${PART_FS}
+						echo "${PART_LABEL}:formated"
+					else
+						# Partition is corrupted, user action required
+						echo "${PART_LABEL}:error"
+						PART_ERROR="yes"
+					fi
+				else
+					echo "${PART_LABEL}:fixed"
+				fi
+			else
+				echo "${PART_LABEL}:ok"
+			fi
+		
+		fi
+		
+		#~ if [ "$DONOT_FORMAT" != "yes" ]; then
+			#~ if [ "$PART_FS" != "-" ]; then
+				#~ msg_id=$(webui_print_working "-" "Formating $PART_LABEL partition...")
+				#~ format_parition $(devname_to_partition $1 $PART_NUM) $PART_LABEL $PART_FS
+				#~ webui_print_success $msg_id "Format \"$PART_LABEL\" partition."
+			#~ fi
+		#~ fi
+		
+	done
+	
+	if [ "${PART_ERROR}" == "yes" ]; then
+		return 1
+	else
+		return 0
+	fi
+}
+
 #
 # @param $1 Disk device.
 #
@@ -608,21 +782,26 @@ create_partitions()
 		else
 			# New partition
 			FDISK_CMD="${FDISK_CMD}n:"
+			
 			# Partition type primary/extended
 			if [ "$PART_NUM" -le 4 ]; then
 				FDISK_CMD="${FDISK_CMD}${PART_TYPE}:"
 			fi
+			
 			# Partition number
 			if [ "$PART_NUM" -lt 4 ]; then
 				FDISK_CMD="${FDISK_CMD}$PART_NUM:"
 			fi
+			
 			# Partition start [ENTER]
 			FDISK_CMD="${FDISK_CMD}:"
+			
 			# Partition end/size
 			if [ "$PART_SIZE" != "-" ]; then
 				FDISK_CMD="$FDISK_CMD+${PART_SIZE}M"	
 			fi
 			FDISK_CMD="${FDISK_CMD}:"
+			
 			# Partition type
 			if [ "$PART_FS" != "-" ]; then
 				FDISK_CMD="${FDISK_CMD}t:"
@@ -651,9 +830,24 @@ create_partitions()
 
 #
 # @param $1 Disk device.
+# @param $2 Force format <yes|no>, skip noformat flag and format anyway
 #
 format_partitions()
 {
+	FORCE_FORMAT="no"
+	if [ -z "$2" ]; then
+		FORCE_FORMAT="no"
+	else
+		FORCE_FORMAT="$2"
+	fi
+	
+	TARGET_PARTITION="-"
+	if [ -z "$3" ]; then
+		TARGET_PARTITION="-"
+	else
+		TARGET_PARTITION="$3"
+	fi
+	
 	for P in $PARTITIONS; do
 		PR=$(echo $P | awk 'BEGIN{FS=":"};{print $5}')
 		FS=$(echo $P | awk 'BEGIN{FS=":"};{print $3}')
@@ -664,17 +858,33 @@ format_partitions()
 			DONOT_FORMAT="yes"
 		fi
 		
+		if [ x"${FORCE_FORMAT}" == x"yes" ]; then
+			DONOT_FORMAT="no"
+		fi
+		
 		PART_SIZE=$(echo $PR | awk 'BEGIN{FS=","};{print $1}')
 		PART_FS=$(echo $FS | awk 'BEGIN{FS=","};{print $1}')
 		PART_LABEL=$(echo $P | awk 'BEGIN{FS=":"};{print $4}')
 		PART_NUM=$(echo $P | awk 'BEGIN{FS=":"};{print $1}')
 		
-		if [ "$DONOT_FORMAT" != "yes" ]; then
-			if [ "$PART_FS" != "-" ]; then
+		if [ x"${TARGET_PARTITION}" != x"-" ]; then
+			if [ x"${PART_LABEL}" == x"${TARGET_PARTITION}" ]; then
 				msg_id=$(webui_print_working "-" "Formating $PART_LABEL partition...")
-				format_parition $(devname_to_partition $1 $PART_NUM) $PART_LABEL $PART_FS
+				format_parition $(devname_to_partition $1 $PART_NUM) ${PART_LABEL} ${PART_FS}
 				webui_print_success $msg_id "Format \"$PART_LABEL\" partition."
 			fi
+		else
+		
+			if [[ ${PART_LABEL} != "boot"  && ${PART_FS} != "-" ]]; then
+			
+				if [ x"$DONOT_FORMAT" == x"no" ]; then
+					msg_id=$(webui_print_working "-" "Formating $PART_LABEL partition...")
+					format_parition $(devname_to_partition $1 $PART_NUM) ${PART_LABEL} ${PART_FS}
+					webui_print_success $msg_id "Format \"$PART_LABEL\" partition."
+				fi
+			
+			fi
+
 		fi
 		
 	done
@@ -689,6 +899,9 @@ prepare_partitions()
 	format_partitions $1
 }
 
+#
+# @param $1 Disk device.
+#
 mount_partitions()
 {
 	DISK=$1

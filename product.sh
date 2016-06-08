@@ -48,3 +48,11 @@ custom_recovery_condition()
 {
 	true
 }
+
+## @fn custom shutdown code
+## These instructions are executed when poweroff is requested,
+## after all the processes have been stopped
+custom_shutdown_end()
+{
+	true
+}
