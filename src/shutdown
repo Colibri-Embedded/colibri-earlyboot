@@ -49,11 +49,9 @@ case $RC in
 	
 		# 1) Remount the bundles partitions as read-write
 		mount -o rw,remount $BUNDLES
-		sleep 5
 		# 2) Execute postponed operations
 		rearrange_bundles "$BUNDLES"
 		# 3) Remount the bundles partitions as read-only
-		sleep 2
 		mount -o ro,remount $BUNDLES
 		sleep 5
 		

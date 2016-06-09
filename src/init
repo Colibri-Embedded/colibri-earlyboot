@@ -144,8 +144,10 @@ else
 		REPORT=""
 		CHECK=0
 	else
+		echo "* Check: Sterted"
 		REPORT=$(check_partitions $DISK)
 		CHECK=$?
+		echo "* Check: Done"
 	fi
 	
 	SUGGESTION="no-action"
