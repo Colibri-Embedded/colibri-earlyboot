@@ -18,6 +18,7 @@ CHANGES=$MEMORY/changes
 UNION=$MEMORY/union
 BDATA=$MEMORY/bdata
 BEXT=cb
+FORCEFSCK=$CHANGES/forcefsck
 
 # System Options
 TMP_SIZE_LIMIT="256M"

@@ -19,6 +19,7 @@ install-kit:
 	$(INSTALL) -D -m 755 src/shutdown $(DESTDIR)/sbin/init
 	$(INSTALL) -D -m 755 src/rc_empty $(DESTDIR)/etc/init.d/rc
 	$(INSTALL) -D -m 644 src/colibrikitlib $(DESTDIR)/lib/colibrikitlib
+	$(INSTALL) -D -m 755 src/mkusers $(DESTDIR)/sbin/mkusers
 	$(INSTALL) -D -m 644 src/colibriwebui $(DESTDIR)/lib/colibriwebui
 	$(INSTALL) -D -m 644 src/config $(DESTDIR)/lib/.config
 	$(INSTALL) -D -m 644 src/httpd.conf $(DESTDIR)/etc/httpd.conf

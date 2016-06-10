@@ -47,7 +47,7 @@ fi
 
 BOOTPART=$(devname_to_partition $DISK 1)
 
-sleep 1
+#sleep 1
 
 # check boot partition and repair small errors
 fsck.fat -a -w $BOOTPART
@@ -72,7 +72,7 @@ umount $BOOTPART
 . /lib/.user_config
 . /lib/.product.sh
 
-# Delay the boot process until slow devices are loaded
+# Delay the boot process until slow devices are loaded [RPi]
 sleep $BOOT_DELAY
 
 init_network
@@ -139,12 +139,18 @@ else
 	# bigtemp - volatile data, can be reformated in case of failure
 	# userdata - most important data, protect them with your life
 	
+	
+	#~ if skip_partitions_check $DISK; then
+		#~ echo "** skipping fsck"
+		#~ sleep 4
+	#~ fi
+	
 	# Check data integrity
-	if is_recovery_gpio_active || custom_recovery_condition; then
+	if is_recovery_gpio_active || custom_recovery_condition || skip_partitions_check $DISK; then
 		REPORT=""
 		CHECK=0
 	else
-		echo "* Check: Sterted"
+		echo "* Check: Started"
 		REPORT=$(check_partitions $DISK)
 		CHECK=$?
 		echo "* Check: Done"
@@ -165,6 +171,9 @@ else
 			webui_print_simple "-"  "Report:"
 
 			for rpt in ${REPORT}; do
+			
+				echo ${rpt}
+				
 				PART_LABEL=$(echo $rpt | awk 'BEGIN{FS=":"};{print $1}')
 				PART_STATE=$(echo $rpt | awk 'BEGIN{FS=":"};{print $2}')
 				
@@ -369,13 +378,17 @@ init_union "$CHANGES" "$UNION"
 # add data to union
 union_append_bundles "$BUNDLES" "$BDATA" "$UNION"
 
-fstab_create "$UNION" "$DISK"
+regenerate_dynamic_files "$DISK" "$UNION" "$CHANGES" "$BDATA"
 
 cleanup_gpio
 cleanup_uart
 cleanup_webui
 cleanup_network
 cleanup_proc_sysfs
+
+# From this point onwards 
+echo "System was not shutdown properly" > ${FORCEFSCK}
+sync
 
 change_root "$UNION"
 

@@ -401,6 +401,20 @@ to_upper()
 	echo $@ | tr '[:lower:]' '[:upper:]'
 }
 
+are_files_equal()
+{
+	if [ ! -e $1 ] || [ ! -e $2 ]; then
+		return 1
+	fi
+	
+	S1=$(md5sum $1 | awk '{print $1}')
+	S2=$(md5sum $2 | awk '{print $1}')
+	
+	[ x"${S1}" == x"${S2}" ]  || return 1
+	
+	return 0
+}
+
 is_this_qemu()
 {
 	HW=$(cat /proc/cpuinfo | grep Hardware)
@@ -450,6 +464,30 @@ resize_partition()
 			return 1
 			;;
 	esac
+}
+
+# @param $1 disk
+skip_partitions_check()
+{
+	PN=$(label_to_partnum "changes")
+	DEV=$(devname_to_partition $1 $PN)
+	
+	SKIP="yes"
+	
+	mkdir -p $CHANGES
+	mount $DEV -o ro $CHANGES
+	
+	if [ -f ${FORCEFSCK} ]; then
+		SKIP="no"
+	fi
+	
+	umount $DEV
+	
+	if [ x"${SKIP}" == x"yes" ]; then
+		return 0
+	else
+		return 1
+	fi
 }
 
 # @param $1 device
@@ -596,7 +634,7 @@ fstype_to_partition_type()
 
 ## @fn devname_to_partition()
 ## @param $1 device name
-## @param $2 partitioni number
+## @param $2 partition number
 devname_to_partition()
 {	
 	if [ $(echo "$1" | grep -E "^/dev/sd[a-z]$") ]; then
@@ -609,6 +647,26 @@ devname_to_partition()
 		echo "disk type not supported"
 		exit 1
 	fi
+}
+
+## @fn label_to_partnum()
+## @param $1 partition label
+label_to_partnum()
+{	
+	RESULT="y"
+	
+	for P in $PARTITIONS; do
+		PART_LABEL=$(echo $P | awk 'BEGIN{FS=":"};{print $4}')
+		PART_NUM=$(echo $P | awk 'BEGIN{FS=":"};{print $1}')
+		
+		if [ x"${PART_LABEL}" == x"$1" ]; then
+			echo ${PART_NUM}
+			return 0
+		fi
+	done
+		
+	echo "0"
+	return 1
 }
 
 ## @fn has_tag()
@@ -955,4 +1013,92 @@ mount_partitions()
 		fi
 	done
 
+}
+
+smart_copy()
+{
+	if ! are_files_equal $1 $2; then
+		cp $1 $2
+	fi
+}
+
+# Find original version of a requested file.
+# Originals are looked up in BDATA directories
+# @param $1 "$BDATA"
+# @param $2 filename
+find_original_file()
+{
+	for bundle in $(cd ${1}/; ls -d *.${BEXT});do
+		ORIG=${1}/${bundle}/${2}
+		if [ -e ${ORIG} ]; then
+			echo ${ORIG}
+			return 0
+		fi
+	done
+	
+	return 1
+}
+
+# @param $1 BDATA
+# @param $2 TARGET_DIR
+generate_user_table()
+{
+	local TARGET_DIR=$2
+	local DYN_FILES="etc/passwd etc/group etc/shadow etc/gshadow"
+	local METADATA_DIR="var/lib/colibri/bundle"
+	local TMP_DIR=$(mktemp -d)
+	local USER_TABLE=${TMP_DIR}/user_table
+	
+	# Copy originals
+	for df in ${DYN_FILES}; do
+		ORIG_FN=/${df}
+		ORIG_PATH=$(find_original_file ${1} ${ORIG_FN})
+		if [ -n "${ORIG_PATH}" ]; then
+			if [ -e ${ORIG_PATH} ]; then
+				mkdir -p $(dirname ${TMP_DIR}/${df})
+				cp ${ORIG_PATH} ${TMP_DIR}/${df}
+			fi
+		fi
+	done
+
+	# Gather user_table from bundles
+	rm -f ${USER_TABLE}
+
+	for bundle in $(cd ${1}/; ls -d *.${BEXT});do
+		B=${bundle%%.cb*}
+		PRI=${B%%-*}
+		N1=${B##[0-9][0-9][0-9]-}
+		NAME=${N1%%-v[0-9]*}
+		
+		UT=${1}/${bundle}/${METADATA_DIR}/${NAME}/user_table
+		
+		if [ -e "${UT}" ]; then
+			cat ${UT} >> ${USER_TABLE}
+		fi
+	done
+	
+	mkusers ${USER_TABLE} ${TMP_DIR}
+	
+	# Copy generated files back to the system
+	for df in ${DYN_FILES}; do
+		NEWF=${TMP_DIR}/${df}
+		if [ -e ${NEWF} ]; then
+			smart_copy ${NEWF} ${TARGET_DIR}/${df}
+		fi
+	done
+	
+	rm -rf ${TMP_DIR}
+}
+
+# @param $1 "$DISK"
+# @param $2 "$UNION"
+# @param $3 "$CHANGES"
+# @param $4 "$BDATA"
+regenerate_dynamic_files()
+{
+	# Regenerate fstab
+	fstab_create "$2" "$1"
+	
+	# Regenerate etc/passwd, etc/group, etc/shadow
+	generate_user_table "$4" "$3"
 }
