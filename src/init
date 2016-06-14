@@ -243,7 +243,7 @@ else
 		USER_ACTION=$(webui_waitfor_response "Full Reinstall:1|Lite Reinstall:2|Restore Bundles:3|Boot:4")
 		case $USER_ACTION in
 			1) # Full reinstall
-				webui_print_simple "-"  "Factory reinstall"
+				webui_print_simple "-"  "Full reinstall"
 				
 				### @TODO: check_partition_table
 				
@@ -302,7 +302,7 @@ else
 				echo "This file indicates that we are booting for the first time" > /lib/firstboot
 				;;
 			3) # Restore bundles
-				webui_print_simple "-"  "TODO"
+				webui_print_simple "-"  "Restore Bundles"
 				
 				format_partitions $DISK "yes" "bundles"
 				

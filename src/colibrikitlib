@@ -130,10 +130,15 @@ fstab_create()
 {
 	local FSTAB
 	local DISK
-	FSTAB="$1/etc/fstab"
 	DISK="$2"
+	TMD_DIR=$(mktemp -d)
 	
-	echo "# Automaticaly generated fstab by Colibri early-boot" > $FSTAB
+	#FSTAB="$1/etc/fstab"
+	FSTAB="${TMP_DIR}/fstab"
+	
+	echo "# Automaticaly generated fstab by colibri-earlyboot" > $FSTAB
+	echo "# Do not manually edit this file, it will be regenerated on" >> $FSTAB
+	echo "# the next boot." >> $FSTAB
 	echo aufs / aufs defaults 0 0 >> $FSTAB
 	echo proc /proc proc defaults 0 0 >> $FSTAB
 	echo sysfs /sys sysfs defaults 0 0 >> $FSTAB
@@ -143,10 +148,12 @@ fstab_create()
 	echo devpts /dev/pts devpts gid=5,mode=620,nosuid,noexec 0 0 >> $FSTAB
 	echo tmpfs /dev/shm tmpfs rw,nosuid,nodev 0 0 >> $FSTAB
 	
-	FSMOUNT="$1/etc/init.d/earlyboot.mount"
+	#FSMOUNT="$1/etc/init.d/earlyboot.mount"
+	FSMOUNT="${TMP_DIR}/earlyboot.mount"
 	echo "#/bin/bash" > $FSMOUNT
 	
-	FSUMOUNT="$1/etc/init.d/earlyboot.umount"
+	#FSUMOUNT="$1/etc/init.d/earlyboot.umount"
+	FSUMOUNT="${TMP_DIR}earlyboot.umount"
 	echo "#/bin/bash" > $FSUMOUNT
 	
 	echo "mount /tmp" >> $FSMOUNT
@@ -156,7 +163,7 @@ fstab_create()
 	echo "mkdir -p /dev/shm" >> $FSMOUNT
 	echo "chmod 1777 /dev/shm" >> $FSMOUNT
 	echo "mount /dev/shm" >> $FSMOUNT
-	chmod +x $FSMOUNT
+	
 		
 	# Extra partitions
 	for P in $PARTITIONS; do
@@ -192,8 +199,19 @@ fstab_create()
 	echo "umount /sys"  >> $FSUMOUNT
 	echo "umount /proc"  >> $FSUMOUNT
 	echo "umount -l /dev"  >> $FSUMOUNT
+	
+	FSTAB="$1/etc/fstab"
+	FSMOUNT="$1/etc/init.d/earlyboot.mount"
+	FSUMOUNT="$1/etc/init.d/earlyboot.umount"
+	
+	smart_copy ${TMP_DIR}/fstab ${FSTAB}
+	smart_copy ${TMP_DIR}/earlyboot.mount ${FSMOUNT}
+	smart_copy ${TMP_DIR}/earlyboot.umount ${FSUMOUNT}
+	
+	chmod +x $FSMOUNT
 	chmod +x $FSUMOUNT
 	
+	rm -rf ${TMD_DIR}
 }
 
 # Change root and execute init
