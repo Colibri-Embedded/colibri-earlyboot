@@ -31,9 +31,11 @@ RC=$(cat /run/rc.earlyboot)
 
 case $RC in
 	poweroff)
+		custom_shutdown_end
 		/sbin/poweroff -f
 		;;
 	reboot)
+		custom_reboot_end
 		/sbin/reboot -f
 		;;
 	soft-reboot)

@@ -131,7 +131,7 @@ fstab_create()
 	local FSTAB
 	local DISK
 	DISK="$2"
-	TMD_DIR=$(mktemp -d)
+	TMP_DIR=$(mktemp -d)
 	
 	#FSTAB="$1/etc/fstab"
 	FSTAB="${TMP_DIR}/fstab"
@@ -153,7 +153,7 @@ fstab_create()
 	echo "#/bin/bash" > $FSMOUNT
 	
 	#FSUMOUNT="$1/etc/init.d/earlyboot.umount"
-	FSUMOUNT="${TMP_DIR}earlyboot.umount"
+	FSUMOUNT="${TMP_DIR}/earlyboot.umount"
 	echo "#/bin/bash" > $FSUMOUNT
 	
 	echo "mount /tmp" >> $FSMOUNT
@@ -211,7 +211,7 @@ fstab_create()
 	chmod +x $FSMOUNT
 	chmod +x $FSUMOUNT
 	
-	rm -rf ${TMD_DIR}
+	rm -rf ${TMP_DIR}
 }
 
 # Change root and execute init
@@ -271,18 +271,86 @@ cleanup_network()
 #
 init_gpio()
 {
-	if [ "x$RECOVERY_PIN" != "xno" ]; then
-		echo "$RECOVERY_PIN" > /sys/class/gpio/export
-		GPIO_DIR="gpio$RECOVERY_PIN"
-		echo "in" > /sys/class/gpio/$GPIO_DIR/direction
+	#~ if [ "x$RECOVERY_PIN" != "xno" ]; then
+		#~ echo "$RECOVERY_PIN" > /sys/class/gpio/export
+		#~ GPIO_DIR="gpio$RECOVERY_PIN"
+		#~ echo "in" > /sys/class/gpio/$GPIO_DIR/direction
+	#~ fi
+	
+	local gpio_state=$(echo $GPIO_INIT | sed 's/,/ /g')
+	for io in ${gpio_state}; do
+		PIN=$(echo $io | awk 'BEGIN{FS=":"};{print $1}')
+		STATE=$(echo $io | awk 'BEGIN{FS=":"};{print $2}')
+		
+		echo "pin: $PIN ($STATE) [$io]"
+		
+		echo "$PIN" > /sys/class/gpio/export
+		GPIO_DIR="gpio$PIN"
+		echo "$STATE" > /sys/class/gpio/$GPIO_DIR/direction
+		
+		echo "$PIN" >> /run/pin_exported
+	done
+}
+
+export_gpio()
+{
+	echo "$1" > /sys/class/gpio/export
+	echo "$1" >> /run/pin_exported
+}
+
+unexport_gpio()
+{
+	echo "$1" > /sys/class/gpio/unexport
+	if [ -e /run/pin_exported ]; then
+		sed "/$1/d" -i /run/pin_exported
 	fi
+}
+
+set_direction_gpio()
+{
+	GPIO_DIR="gpio$1"
+	echo "$2" > /sys/class/gpio/$GPIO_DIR/direction
+}
+
+# Cleanup GPIO settings
+#
+cleanup_gpio()
+{
+	#~ if [ "x$RECOVERY_PIN" != "xno" ]; then
+		#~ echo "$RECOVERY_PIN" > /sys/class/gpio/unexport
+	#~ fi
+	if [ -e /run/pin_exported ]; then
+		for pin in $(cat /run/pin_exported); do
+			echo "$pin" > /sys/class/gpio/unexport
+		done
+		rm -f /run/pin_exported
+	fi
+}
+
+# Write data to GPIO
+# @param $1 GPIO number
+# @param $2 GPIO value
+write_gpio()
+{
+	GPIO_DIR="gpio$1"
+	echo "$2" > /sys/class/gpio/${GPIO_DIR}/value
+}
+
+# Read GPIO state
+# @param $1 GPIO number
+read_gpio()
+{
+	GPIO_DIR="gpio$1"
+	V=$(cat /sys/class/gpio/${GPIO_DIR}/value)
+	echo $V
 }
 
 is_recovery_gpio_active()
 {
 	if [ "x$RECOVERY_PIN" != "xno" ]; then
+		#~ V=$(read_gpio $RECOVERY_PIN)
 		GPIO_DIR="gpio$RECOVERY_PIN"
-		V=$(cat /sys/class/gpio/$GPIO_DIR/value)
+		V=$(cat /sys/class/gpio/${GPIO_DIR}/value)
 		
 		# work around for QEMU PL061 gpio
 		# as it cannot be controled from outside we must not use
@@ -300,15 +368,6 @@ is_recovery_gpio_active()
 	else
 		# Return false in case no recovery pin is used
 		return 1
-	fi
-}
-
-# Cleanup GPIO settings
-#
-cleanup_gpio()
-{
-	if [ "x$RECOVERY_PIN" != "xno" ]; then
-		echo "$RECOVERY_PIN" > /sys/class/gpio/unexport
 	fi
 }
 
@@ -972,7 +1031,8 @@ format_partitions()
 prepare_partitions()
 {
 	create_partitions $1
-	format_partitions $1
+	# Force partition formatting
+	format_partitions $1 "yes"
 }
 
 #
