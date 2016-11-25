@@ -22,6 +22,9 @@
 
 . /lib/colibriwebui
 
+export TOTAL_TASK_COUNT=0
+export CURRENT_TASK_COUNT=0
+
 # get value of commandline parameter $1
 # @param $1 parameter to search for
 #
@@ -920,6 +923,9 @@ create_partitions()
 			msg_id=$(webui_print_working "-" "Resizing \"$PART_LABEL\" partition...")
 			resize_partition $PART_DEV $PART_SIZE $PART_FS
 			webui_print_success $msg_id "Resize \"$PART_LABEL\" partition."
+			
+			let "CURRENT_TASK_COUNT++"
+			webui_print_progress "$CURRENT_TASK_COUNT/$TOTAL_TASK_COUNT"
 		else
 			# New partition
 			FDISK_CMD="${FDISK_CMD}n:"
@@ -960,6 +966,9 @@ create_partitions()
 	fdisk -u $1 < /tmp/cmds &> /dev/null
 	rm /tmp/cmds
 	webui_print_success $msg_id "Create system partitions."
+	
+	let "CURRENT_TASK_COUNT++"
+	webui_print_progress "$CURRENT_TASK_COUNT/$TOTAL_TASK_COUNT"
 	
 	msg_id=$(webui_print_working "-" "Updating block devices...")
 	sync
@@ -1010,18 +1019,24 @@ format_partitions()
 		
 		if [ x"${TARGET_PARTITION}" != x"-" ]; then
 			if [ x"${PART_LABEL}" == x"${TARGET_PARTITION}" ]; then
-				msg_id=$(webui_print_working "-" "Formating $PART_LABEL partition...")
+				msg_id=$(webui_print_working "-" "Formating \"$PART_LABEL\" partition...")
 				format_parition $(devname_to_partition $1 $PART_NUM) ${PART_LABEL} ${PART_FS}
 				webui_print_success $msg_id "Format \"$PART_LABEL\" partition."
+				
+				let "CURRENT_TASK_COUNT++"
+				webui_print_progress "$CURRENT_TASK_COUNT/$TOTAL_TASK_COUNT"
 			fi
 		else
 		
 			if [[ ${PART_LABEL} != "boot"  && ${PART_FS} != "-" ]]; then
 			
 				if [ x"$DONOT_FORMAT" == x"no" ]; then
-					msg_id=$(webui_print_working "-" "Formating $PART_LABEL partition...")
+					msg_id=$(webui_print_working "-" "Formating \"$PART_LABEL\" partition...")
 					format_parition $(devname_to_partition $1 $PART_NUM) ${PART_LABEL} ${PART_FS}
 					webui_print_success $msg_id "Format \"$PART_LABEL\" partition."
+					
+					let "CURRENT_TASK_COUNT++"
+					webui_print_progress "$CURRENT_TASK_COUNT/$TOTAL_TASK_COUNT"
 				fi
 			
 			fi
@@ -1074,9 +1089,6 @@ format_partitions_task_count()
 		
 		if [ x"${TARGET_PARTITION}" != x"-" ]; then
 			if [ x"${PART_LABEL}" == x"${TARGET_PARTITION}" ]; then
-				#msg_id=$(webui_print_working "-" "Formating $PART_LABEL partition...")
-				#format_parition $(devname_to_partition $1 $PART_NUM) ${PART_LABEL} ${PART_FS}
-				#webui_print_success $msg_id "Format \"$PART_LABEL\" partition."
 				TASK_COUNT=$(expr $TASK_COUNT + 1)
 			fi
 		else
@@ -1084,9 +1096,6 @@ format_partitions_task_count()
 			if [[ ${PART_LABEL} != "boot"  && ${PART_FS} != "-" ]]; then
 			
 				if [ x"$DONOT_FORMAT" == x"no" ]; then
-					#msg_id=$(webui_print_working "-" "Formating $PART_LABEL partition...")
-					#format_parition $(devname_to_partition $1 $PART_NUM) ${PART_LABEL} ${PART_FS}
-					#webui_print_success $msg_id "Format \"$PART_LABEL\" partition."
 					TASK_COUNT=$(expr $TASK_COUNT + 1)
 				fi
 			

@@ -64,6 +64,7 @@ if [ -f /mnt/boot/earlyboot/webui.tar ]; then
 	rm -Rf /www/*
 	tar xf /mnt/boot/earlyboot/webui.tar -C /www/
 fi
+TOTAL_FILE_COPY=$(ls /mnt/boot/bundles/* | awk 'END{print FNR}')
 # Unmount boot partition
 umount $BOOTPART
 #rm -rf /mnt/boot
@@ -96,32 +97,46 @@ if [ "$IS_FIRSBOOT" == "1" ]; then
 	# Custom commands
 	custom_firstboot_begin
 	
+	# 4 overall tasks, 2 create_partition tasts
+	TOTAL_TASK_COUNT=$(expr 2 + 4 + $(format_partitions_task_count $DISK "yes") + $TOTAL_FILE_COPY )
+	echo "TOTAL_TASK_COUNT $TOTAL_TASK_COUNT"
+	
 	#webui_print_question "-"  "Choose further action:"
 	FIRST_FORMAT=$(webui_waitfor_response "Install:1")
 
-	webui_print_progress "0/4"
+	#webui_print_progress "$CURRENT_TASK_COUNT/$TOTAL_TASK_COUNT"
 
 	#msg_id=$(webui_print_working "-"  "Formatting partitions...")
 	prepare_partitions $DISK
 	#webui_print_success $msg_id "Format partitions."
-	webui_print_progress "1/4"
+	#~ webui_print_progress "1/4"
+	let "CURRENT_TASK_COUNT++"
+	webui_print_progress "$CURRENT_TASK_COUNT/$TOTAL_TASK_COUNT"
 	
 	msg_id=$(webui_print_working "-" "Mounting partitions...")
 	mount_partitions $DISK
 	webui_print_success $msg_id "Partitions mounted."	
-	webui_print_progress "2/4"
+	#webui_print_progress "2/4"
+	let "CURRENT_TASK_COUNT++"
+	webui_print_progress "$CURRENT_TASK_COUNT/$TOTAL_TASK_COUNT"
 	
 	msg_id=$(webui_print_working "-" "Copying bundles from recovery partition...")
 	
 	# Mount bundles partition read-write
 	mount -o rw,remount $BUNDLES
-	cp $MOUNTBASE/boot/bundles/* $BUNDLES/
+	for f in $(ls $MOUNTBASE/boot/bundles/*); do
+		cp $f $BUNDLES/
+		let "CURRENT_TASK_COUNT++"
+		webui_print_progress "$CURRENT_TASK_COUNT/$TOTAL_TASK_COUNT"
+	done
 	mount -o ro,remount $BUNDLES
 	
 	sync
 	sleep 1
 	webui_print_success $msg_id "Copy bundles from recovery partition."	
-	webui_print_progress "3/4"
+	#~ webui_print_progress "3/4"
+	let "CURRENT_TASK_COUNT++"
+	webui_print_progress "$CURRENT_TASK_COUNT/$TOTAL_TASK_COUNT"
 	
 	# turn off FIRSTBOOT
 	mount $BOOTPART -o rw,remount /mnt/boot
@@ -134,7 +149,8 @@ if [ "$IS_FIRSBOOT" == "1" ]; then
 	# Set firstboot indication for application's system firstboot handling
 	echo "This file indicates that we are booting for the first time" > /lib/firstboot
 	
-	webui_print_progress "4/4"
+	webui_print_progress "$TOTAL_TASK_COUNT/$TOTAL_TASK_COUNT"
+	
 	webui_print_success - "Done."
 	# Custom commands
 	custom_firstboot_end
@@ -256,7 +272,11 @@ else
 		USER_ACTION=$(webui_waitfor_response "Full Reinstall:1|Lite Reinstall:2|Restore Bundles:3|Boot:4")
 		case $USER_ACTION in
 			1) # Full reinstall
-				webui_print_progress "0/4"
+				# 4 overall tasks
+				TOTAL_TASK_COUNT=$(expr 4 + $(format_partitions_task_count $DISK "yes") + $TOTAL_FILE_COPY )
+				echo "TOTAL_TASK_COUNT $TOTAL_TASK_COUNT"
+	
+				webui_print_progress "$CURRENT_TASK_COUNT/$TOTAL_TASK_COUNT"
 				webui_print_simple "-"  "Full reinstall"
 				
 				### @TODO: check_partition_table
@@ -266,24 +286,29 @@ else
 				#msg_id=$(webui_print_working "-"  "Formatting partitions...")
 				format_partitions $DISK "yes"
 				#webui_print_success $msg_id "Format partitions."
-				webui_print_progress "1/4"
 				
 				msg_id=$(webui_print_working "-" "Mounting partitions...")
 				mount_partitions $DISK
 				webui_print_success $msg_id "Partitions mounted."	
-				webui_print_progress "2/4"
+				let "CURRENT_TASK_COUNT++"
+				webui_print_progress "$CURRENT_TASK_COUNT/$TOTAL_TASK_COUNT"
 				
 				msg_id=$(webui_print_working "-" "Copying bundles from recovery partition...")
 				
 				# Mount bundles partition read-write
 				mount -o rw,remount $BUNDLES
-				cp $MOUNTBASE/boot/bundles/* $BUNDLES/
+				for f in $(ls $MOUNTBASE/boot/bundles/*); do
+					cp $f $BUNDLES/
+					let "CURRENT_TASK_COUNT++"
+					webui_print_progress "$CURRENT_TASK_COUNT/$TOTAL_TASK_COUNT"
+				done
 				mount -o ro,remount $BUNDLES
 				
 				sync
 				sleep 1
 				webui_print_success $msg_id "Copy bundles from recovery partition."	
-				webui_print_progress "3/4"
+				let "CURRENT_TASK_COUNT++"
+				webui_print_progress "$CURRENT_TASK_COUNT/$TOTAL_TASK_COUNT"
 				
 				# Boot partition is not used anymore
 				# Remount the boot partition as read-only
@@ -291,37 +316,46 @@ else
 				# Set firstboot indication for application's system firstboot handling
 				echo "This file indicates that we are booting for the first time" > /lib/firstboot
 				
-				webui_print_progress "4/4"
+				webui_print_progress "$TOTAL_TASK_COUNT/$TOTAL_TASK_COUNT"
 				webui_print_success "-"  "Done."
 				;;
 			2) # Lite Reinstall
 				webui_print_simple "-"  "Lite reinstall"
 				### @TODO: check_partition_table
-				webui_print_progress "0/4"
+				# 3 overall tasks
+				TOTAL_TASK_COUNT=$(expr 3 + $(format_partitions_task_count $DISK "no") + $TOTAL_FILE_COPY )
+				echo "TOTAL_TASK_COUNT $TOTAL_TASK_COUNT"
+				webui_print_progress "$CURRENT_TASK_COUNT/$TOTAL_TASK_COUNT"
 				
 				# Format only partitions that are not flagged noformat
 				# This will skip any userdata partitions
 				#msg_id=$(webui_print_working "-"  "Formatting partitions...")
 				format_partitions $DISK "no"
 				#webui_print_success $msg_id "Format partitions."
-				webui_print_progress "1/4"
+
 				
 				msg_id=$(webui_print_working "-" "Mounting partitions...")
 				mount_partitions $DISK
 				webui_print_success $msg_id "Partitions mounted."
-				webui_print_progress "2/4"
+				let "CURRENT_TASK_COUNT++"
+				webui_print_progress "$CURRENT_TASK_COUNT/$TOTAL_TASK_COUNT"
 				
 				msg_id=$(webui_print_working "-" "Copying bundles from recovery partition...")
 				
 				# Mount bundles partition read-write
 				mount -o rw,remount $BUNDLES
-				cp $MOUNTBASE/boot/bundles/* $BUNDLES/
+				for f in $(ls $MOUNTBASE/boot/bundles/*); do
+					cp $f $BUNDLES/
+					let "CURRENT_TASK_COUNT++"
+					webui_print_progress "$CURRENT_TASK_COUNT/$TOTAL_TASK_COUNT"
+				done
 				mount -o ro,remount $BUNDLES
 				
 				sync
 				sleep 1
 				webui_print_success $msg_id "Copy bundles from recovery partition."	
-				webui_print_progress "3/4"
+				let "CURRENT_TASK_COUNT++"
+				webui_print_progress "$CURRENT_TASK_COUNT/$TOTAL_TASK_COUNT"
 				
 				# Boot partition is not used anymore
 				# Remount the boot partition as read-only
@@ -329,40 +363,46 @@ else
 				# Set firstboot indication for application's system firstboot handling
 				echo "This file indicates that we are booting for the first time" > /lib/firstboot
 				
-				webui_print_progress "4/4"
+				webui_print_progress "$TOTAL_TASK_COUNT/$TOTAL_TASK_COUNT"
 				webui_print_success "-"  "Done."
 				;;
 			3) # Restore bundles
 				webui_print_simple "-"  "Restore Bundles"
-				webui_print_progress "0/4"
+				# 3 overall tasks
+				TOTAL_TASK_COUNT=$(expr 3 + $(format_partitions_task_count $DISK "yes" "bundles") + $TOTAL_FILE_COPY )
+				echo "TOTAL_TASK_COUNT $TOTAL_TASK_COUNT"
+				webui_print_progress "$CURRENT_TASK_COUNT/$TOTAL_TASK_COUNT"
 				
-				#msg_id=$(webui_print_working "-"  "Formatting partitions...")
 				format_partitions $DISK "yes" "bundles"
-				#webui_print_success $msg_id "Format paritions."
-				webui_print_progress "1/4"
 				
 				msg_id=$(webui_print_working "-" "Mounting partitions...")
 				mount_partitions $DISK
 				webui_print_success $msg_id "Partitions mounted."
-				webui_print_progress "2/4"
+				let "CURRENT_TASK_COUNT++"
+				webui_print_progress "$CURRENT_TASK_COUNT/$TOTAL_TASK_COUNT"
 				
 				msg_id=$(webui_print_working "-" "Copying bundles from recovery partition...")
 				
 				# Mount bundles partition read-write
 				mount -o rw,remount $BUNDLES
-				cp $MOUNTBASE/boot/bundles/* $BUNDLES/
+				for f in $(ls $MOUNTBASE/boot/bundles/*); do
+					cp $f $BUNDLES/
+					let "CURRENT_TASK_COUNT++"
+					webui_print_progress "$CURRENT_TASK_COUNT/$TOTAL_TASK_COUNT"
+				done
 				mount -o ro,remount $BUNDLES
 				
 				sync
 				sleep 1
 				webui_print_success $msg_id "Copy bundles from recovery partition."
-				webui_print_progress "3/4"
+				let "CURRENT_TASK_COUNT++"
+				webui_print_progress "$CURRENT_TASK_COUNT/$TOTAL_TASK_COUNT"
 				# Boot partition is not used anymore
 				# Remount the boot partition as read-only
 				mount $BOOTPART -o remount,ro /mnt/boot
 				
 				webui_print_success "-"  "Done."
-				webui_print_progress "4/4"
+				webui_print_progress "$TOTAL_TASK_COUNT/$TOTAL_TASK_COUNT"
 				
 				;;
 			4) # Boot
