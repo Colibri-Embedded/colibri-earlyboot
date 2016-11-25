@@ -46,13 +46,14 @@ webui_redirect()
 	PREFIX="redirect"
 	URL="$1"
 	TIMEOUT="$2"
+	URL_AUTO="$3"
 	
-	ITEM="${URL}|${TIMEOUT}"
+	ITEM="${URL}|${TIMEOUT}|${URL_AUTO}"
 	
 	IID=$(awk 'END{print FNR}' $WEBUI_DB)
-	if [ "$IID" != "0" ]; then
-		let "IID--"
-	fi
+	#~ if [ "$IID" != "0" ]; then
+		#~ let "IID--"
+	#~ fi
 	echo "$IID@${PREFIX}::${ITEM}" >> $WEBUI_DB
 	echo $IID	
 }
@@ -72,9 +73,9 @@ webui_print()
 		#echo "$new_item"
 	else
 		IID=$(awk 'END{print FNR}' $WEBUI_DB)
-		if [ "$IID" != "0" ]; then
-			let "IID--"
-		fi
+		#~ if [ "$IID" != "0" ]; then
+			#~ let "IID--"
+		#~ fi
 		echo "$IID@$PREFIX::$@" >> $WEBUI_DB
 	fi
 	echo $IID
@@ -129,6 +130,24 @@ webui_print_question()
 	old_id=$1
 	shift
 	webui_print "question" $old_id $@
+}
+
+webui_print_mode()
+{
+	old_id="-"
+	webui_print "mode" $old_id $@
+}
+
+webui_print_suggestion()
+{
+	old_id="-"
+	webui_print "suggestion" $old_id $@
+}
+
+webui_print_progress()
+{
+	old_id="-"
+	webui_print "progress" $old_id $@ &> /dev/null
 }
 
 webui_waitfor_response()

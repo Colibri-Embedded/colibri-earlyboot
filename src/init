@@ -91,6 +91,7 @@ fi
 
 if [ "$IS_FIRSBOOT" == "1" ]; then
 	webui_print_simple "-"  "========= First Time Boot ========="
+	webui_print_mode "firstboot"
 	echo "========= First Time Boot ========="
 	# Custom commands
 	custom_firstboot_begin
@@ -98,12 +99,17 @@ if [ "$IS_FIRSBOOT" == "1" ]; then
 	#webui_print_question "-"  "Choose further action:"
 	FIRST_FORMAT=$(webui_waitfor_response "Install:1")
 
-	#webui_print_simple "-"  "========= System Preparations Started ========="
+	webui_print_progress "0/4"
+
+	#msg_id=$(webui_print_working "-"  "Formatting partitions...")
 	prepare_partitions $DISK
+	#webui_print_success $msg_id "Format partitions."
+	webui_print_progress "1/4"
 	
 	msg_id=$(webui_print_working "-" "Mounting partitions...")
 	mount_partitions $DISK
 	webui_print_success $msg_id "Partitions mounted."	
+	webui_print_progress "2/4"
 	
 	msg_id=$(webui_print_working "-" "Copying bundles from recovery partition...")
 	
@@ -115,7 +121,7 @@ if [ "$IS_FIRSBOOT" == "1" ]; then
 	sync
 	sleep 1
 	webui_print_success $msg_id "Copy bundles from recovery partition."	
-	
+	webui_print_progress "3/4"
 	
 	# turn off FIRSTBOOT
 	mount $BOOTPART -o rw,remount /mnt/boot
@@ -128,6 +134,8 @@ if [ "$IS_FIRSBOOT" == "1" ]; then
 	# Set firstboot indication for application's system firstboot handling
 	echo "This file indicates that we are booting for the first time" > /lib/firstboot
 	
+	webui_print_progress "4/4"
+	webui_print_success - "Done."
 	# Custom commands
 	custom_firstboot_end
 else
@@ -163,9 +171,11 @@ else
 	
 		if [ x"${CHECK}" == x"0" ]; then
 			webui_print_simple "-"  "========= Recovery ========="
+			webui_print_mode "recovery"
 			echo  "========= Recovery ========="
 		else
 			webui_print_simple "-"  "========= Forced Recovery ========="
+			webui_print_mode "forced-recovery"
 			echo  "========= Forced Recovery ========="
 
 			webui_print_simple "-"  "Report:"
@@ -216,6 +226,9 @@ else
 				
 			done
 			
+			# Used by the front end.
+			webui_print_suggestion "-" ${SUGGESTION}
+			
 			case ${SUGGESTION} in
 				no-action)
 					webui_print_simple "-"  "Suggestion: No Action"
@@ -243,17 +256,22 @@ else
 		USER_ACTION=$(webui_waitfor_response "Full Reinstall:1|Lite Reinstall:2|Restore Bundles:3|Boot:4")
 		case $USER_ACTION in
 			1) # Full reinstall
+				webui_print_progress "0/4"
 				webui_print_simple "-"  "Full reinstall"
 				
 				### @TODO: check_partition_table
-				
-				# Force formating of all partition, even those marked as noformat
+	
+				# Force Formatting of all partition, even those marked as noformat
 				# The only partition that will not be formated is the BOOT partition
+				#msg_id=$(webui_print_working "-"  "Formatting partitions...")
 				format_partitions $DISK "yes"
+				#webui_print_success $msg_id "Format partitions."
+				webui_print_progress "1/4"
 				
 				msg_id=$(webui_print_working "-" "Mounting partitions...")
 				mount_partitions $DISK
 				webui_print_success $msg_id "Partitions mounted."	
+				webui_print_progress "2/4"
 				
 				msg_id=$(webui_print_working "-" "Copying bundles from recovery partition...")
 				
@@ -265,24 +283,33 @@ else
 				sync
 				sleep 1
 				webui_print_success $msg_id "Copy bundles from recovery partition."	
+				webui_print_progress "3/4"
 				
 				# Boot partition is not used anymore
 				# Remount the boot partition as read-only
 				mount $BOOTPART -o remount,ro /mnt/boot
 				# Set firstboot indication for application's system firstboot handling
 				echo "This file indicates that we are booting for the first time" > /lib/firstboot
+				
+				webui_print_progress "4/4"
+				webui_print_success "-"  "Done."
 				;;
 			2) # Lite Reinstall
 				webui_print_simple "-"  "Lite reinstall"
 				### @TODO: check_partition_table
+				webui_print_progress "0/4"
 				
 				# Format only partitions that are not flagged noformat
 				# This will skip any userdata partitions
+				#msg_id=$(webui_print_working "-"  "Formatting partitions...")
 				format_partitions $DISK "no"
+				#webui_print_success $msg_id "Format partitions."
+				webui_print_progress "1/4"
 				
 				msg_id=$(webui_print_working "-" "Mounting partitions...")
 				mount_partitions $DISK
-				webui_print_success $msg_id "Partitions mounted."	
+				webui_print_success $msg_id "Partitions mounted."
+				webui_print_progress "2/4"
 				
 				msg_id=$(webui_print_working "-" "Copying bundles from recovery partition...")
 				
@@ -294,21 +321,30 @@ else
 				sync
 				sleep 1
 				webui_print_success $msg_id "Copy bundles from recovery partition."	
+				webui_print_progress "3/4"
 				
 				# Boot partition is not used anymore
 				# Remount the boot partition as read-only
 				mount $BOOTPART -o remount,ro /mnt/boot
 				# Set firstboot indication for application's system firstboot handling
 				echo "This file indicates that we are booting for the first time" > /lib/firstboot
+				
+				webui_print_progress "4/4"
+				webui_print_success "-"  "Done."
 				;;
 			3) # Restore bundles
 				webui_print_simple "-"  "Restore Bundles"
+				webui_print_progress "0/4"
 				
+				#msg_id=$(webui_print_working "-"  "Formatting partitions...")
 				format_partitions $DISK "yes" "bundles"
+				#webui_print_success $msg_id "Format paritions."
+				webui_print_progress "1/4"
 				
 				msg_id=$(webui_print_working "-" "Mounting partitions...")
 				mount_partitions $DISK
-				webui_print_success $msg_id "Partitions mounted."	
+				webui_print_success $msg_id "Partitions mounted."
+				webui_print_progress "2/4"
 				
 				msg_id=$(webui_print_working "-" "Copying bundles from recovery partition...")
 				
@@ -319,11 +355,15 @@ else
 				
 				sync
 				sleep 1
-				webui_print_success $msg_id "Copy bundles from recovery partition."					
-				
+				webui_print_success $msg_id "Copy bundles from recovery partition."
+				webui_print_progress "3/4"
 				# Boot partition is not used anymore
 				# Remount the boot partition as read-only
 				mount $BOOTPART -o remount,ro /mnt/boot
+				
+				webui_print_success "-"  "Done."
+				webui_print_progress "4/4"
+				
 				;;
 			4) # Boot
 				RECOVERY_ABORTED=1

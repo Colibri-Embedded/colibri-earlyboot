@@ -492,6 +492,12 @@ are_files_equal()
 	return 0
 }
 
+get_hw_version()
+{
+	HW=$(cat /proc/cpuinfo | grep Hardware)
+	echo ${HW##*:}
+}
+
 is_this_qemu()
 {
 	HW=$(cat /proc/cpuinfo | grep Hardware)
@@ -1023,6 +1029,74 @@ format_partitions()
 		fi
 		
 	done
+}
+
+#
+# @param $1 Disk device.
+# @param $2 Force format <yes|no>, skip noformat flag and format anyway
+#
+format_partitions_task_count()
+{
+	TASK_COUNT=0
+	
+	FORCE_FORMAT="no"
+	if [ -z "$2" ]; then
+		FORCE_FORMAT="no"
+	else
+		FORCE_FORMAT="$2"
+	fi
+	
+	TARGET_PARTITION="-"
+	if [ -z "$3" ]; then
+		TARGET_PARTITION="-"
+	else
+		TARGET_PARTITION="$3"
+	fi
+	
+	for P in $PARTITIONS; do
+		PR=$(echo $P | awk 'BEGIN{FS=":"};{print $5}')
+		FS=$(echo $P | awk 'BEGIN{FS=":"};{print $3}')
+		
+		T=$(echo $FS | awk 'BEGIN{FS=","};{print $2}')
+		DONOT_FORMAT="no"
+		if has_tag $FS "noformat"; then
+			DONOT_FORMAT="yes"
+		fi
+		
+		if [ x"${FORCE_FORMAT}" == x"yes" ]; then
+			DONOT_FORMAT="no"
+		fi
+		
+		PART_SIZE=$(echo $PR | awk 'BEGIN{FS=","};{print $1}')
+		PART_FS=$(echo $FS | awk 'BEGIN{FS=","};{print $1}')
+		PART_LABEL=$(echo $P | awk 'BEGIN{FS=":"};{print $4}')
+		PART_NUM=$(echo $P | awk 'BEGIN{FS=":"};{print $1}')
+		
+		if [ x"${TARGET_PARTITION}" != x"-" ]; then
+			if [ x"${PART_LABEL}" == x"${TARGET_PARTITION}" ]; then
+				#msg_id=$(webui_print_working "-" "Formating $PART_LABEL partition...")
+				#format_parition $(devname_to_partition $1 $PART_NUM) ${PART_LABEL} ${PART_FS}
+				#webui_print_success $msg_id "Format \"$PART_LABEL\" partition."
+				TASK_COUNT=$(expr $TASK_COUNT + 1)
+			fi
+		else
+		
+			if [[ ${PART_LABEL} != "boot"  && ${PART_FS} != "-" ]]; then
+			
+				if [ x"$DONOT_FORMAT" == x"no" ]; then
+					#msg_id=$(webui_print_working "-" "Formating $PART_LABEL partition...")
+					#format_parition $(devname_to_partition $1 $PART_NUM) ${PART_LABEL} ${PART_FS}
+					#webui_print_success $msg_id "Format \"$PART_LABEL\" partition."
+					TASK_COUNT=$(expr $TASK_COUNT + 1)
+				fi
+			
+			fi
+
+		fi
+		
+	done
+	
+	echo $TASK_COUNT
 }
 
 #
