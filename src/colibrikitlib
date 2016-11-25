@@ -191,7 +191,7 @@ fstab_create()
 				echo "mount ${MNT}" >> $FSMOUNT
 			fi	
 			echo "umount ${MNT}" >> $FSUMOUNT
-			echo "rm -rf ${MNT}" >> $FSUMOUNT
+			echo "[ \"\$?\" == \"0\" ] && rm -rf ${MNT}" >> $FSUMOUNT
 		fi
 	done
 
