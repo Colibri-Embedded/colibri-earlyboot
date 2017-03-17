@@ -892,8 +892,11 @@ create_partitions()
 {
 	#DISK=$1
 	# Disk repartitioning (fdisk)
+	msg_id=$(webui_print_working "-" "Creating system partitions...")
+	
 	FDISK_CMD=""
-
+	NEXT_START_OFFSET="0"
+	
 	for P in $PARTITIONS; do
 		PR=$(echo $P | awk 'BEGIN{FS=":"};{print $5}')
 		FS=$(echo $P | awk 'BEGIN{FS=":"};{print $3}')
@@ -914,7 +917,7 @@ create_partitions()
 		PART_NUM=$(echo $P | awk 'BEGIN{FS=":"};{print $1}')
 		PART_TYPE=$(echo $P | awk 'BEGIN{FS=":"};{print $2}')
 		PART_DEV=$(devname_to_partition $1 $PART_NUM)
-		
+
 		#echo "DEBUG [$P]"
 		#echo "DEBUG sz: $PART_SIZE, fs: $PART_FS, lbl: $PART_LABEL, nm: $PART_NUM, tp: $PART_TYPE"
 		#echo "DEBUG dev: $PART_DEV"
@@ -926,6 +929,9 @@ create_partitions()
 			
 			let "CURRENT_TASK_COUNT++"
 			webui_print_progress "$CURRENT_TASK_COUNT/$TOTAL_TASK_COUNT"
+			
+			NEXT_START_OFFSET=$(echo p | fdisk -u $1 | grep $PART_DEV | awk '{print $3}')
+			let "NEXT_START_OFFSET++"
 		else
 			# New partition
 			FDISK_CMD="${FDISK_CMD}n:"
@@ -941,11 +947,11 @@ create_partitions()
 			fi
 			
 			# Partition start [ENTER]
-			FDISK_CMD="${FDISK_CMD}:"
+			FDISK_CMD="${FDISK_CMD}${NEXT_START_OFFSET}:"
 			
 			# Partition end/size
 			if [ "$PART_SIZE" != "-" ]; then
-				FDISK_CMD="$FDISK_CMD+${PART_SIZE}M"	
+				FDISK_CMD="$FDISK_CMD+${PART_SIZE}M"
 			fi
 			FDISK_CMD="${FDISK_CMD}:"
 			
@@ -955,16 +961,40 @@ create_partitions()
 				FDISK_CMD="${FDISK_CMD}${PART_NUM}:"
 				FDISK_CMD="${FDISK_CMD}$(fstype_to_partition_type $PART_FS):"
 			fi
+			
+			FDISK_CMD="${FDISK_CMD}w:"
+			
+			
+			echo -n $FDISK_CMD | sed 's/:/\n/g' > /tmp/cmds
+			cat /tmp/cmds 
+			
+			fdisk -u $1 < /tmp/cmds &> /dev/null
+			sync
+			
+			rm /tmp/cmds
+			FDISK_CMD=""
+			
+			if [ x"$PART_TYPE" == x"e" ]; then
+				if [ x"$PART_FS" == x"-" ]; then
+					let "NEXT_START_OFFSET+=2048"
+				else
+					NEXT_START_OFFSET=$(echo p | fdisk -u $1 | grep $PART_DEV | awk '{print $3}')
+					let "NEXT_START_OFFSET+=2049"
+				fi
+			else
+				NEXT_START_OFFSET=$(echo p | fdisk -u $1 | grep $PART_DEV | awk '{print $3}')
+				let "NEXT_START_OFFSET++"
+			fi
+			
+			
 		fi
-		
-		
 	done
-	FDISK_CMD="${FDISK_CMD}w:"
+	#~ FDISK_CMD="${FDISK_CMD}w:"
 
-	msg_id=$(webui_print_working "-" "Creating system partitions...")
-	echo -n $FDISK_CMD | sed 's/:/\n/g' > /tmp/cmds 
-	fdisk -u $1 < /tmp/cmds &> /dev/null
-	rm /tmp/cmds
+	
+	#~ echo -n $FDISK_CMD | sed 's/:/\n/g' > /tmp/cmds 
+	#~ fdisk -u $1 < /tmp/cmds &> /dev/null
+	#~ rm /tmp/cmds
 	webui_print_success $msg_id "Create system partitions."
 	
 	let "CURRENT_TASK_COUNT++"

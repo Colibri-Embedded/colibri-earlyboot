@@ -108,6 +108,7 @@ if [ "$IS_FIRSBOOT" == "1" ]; then
 
 	#msg_id=$(webui_print_working "-"  "Formatting partitions...")
 	prepare_partitions $DISK
+	
 	#webui_print_success $msg_id "Format partitions."
 	#~ webui_print_progress "1/4"
 	let "CURRENT_TASK_COUNT++"
