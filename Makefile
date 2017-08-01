@@ -8,7 +8,17 @@ DESTDIR ?= ./rootfs
 all:
 
 directory-tree:
-	$(MKDIR) -p $(DESTDIR)/{bin,sbin,etc/init.d,dev,lib/modules,mnt,proc,run,sys,tmp}
+#	$(MKDIR) -p $(DESTDIR)/{bin,sbin,etc/init.d,dev,lib/modules,mnt,proc,run,sys,tmp}
+	$(MKDIR) -p $(DESTDIR)/bin
+	$(MKDIR) -p $(DESTDIR)/sbin
+	$(MKDIR) -p $(DESTDIR)/etc/init.d
+	$(MKDIR) -p $(DESTDIR)/dev
+	$(MKDIR) -p $(DESTDIR)/lib/modules
+	$(MKDIR) -p $(DESTDIR)/mnt
+	$(MKDIR) -p $(DESTDIR)/proc
+	$(MKDIR) -p $(DESTDIR)/run
+	$(MKDIR) -p $(DESTDIR)/sys
+	$(MKDIR) -p $(DESTDIR)/tmp
 	$(CHMOD) 1777 $(DESTDIR)/tmp
 
 install-www:
